@@ -1,62 +1,34 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  RACS / reportes de desviación — Google Apps Script (backend)
+ *  Cambio de EPPS — Google Apps Script (backend)
  *  Compatible con RACSCASMA (js/app.js + js/config.js)
  * ═══════════════════════════════════════════════════════════════════
  *
- *  CÓMO CREAR UN BACKEND NUEVO (otra hoja + otro Drive):
+ *  Evidencias que sí se guardan en Drive:
+ *    foto hallazgo (EPPS viejos) → 01_Fotos_Hallazgo
+ *    firma                       → 02_Firmas
+ *    foto entrega (personal/EPP) → 04_Fotos_Entrega
  *
- *  1) Google Sheets → Nueva hoja (ej. "RACS - Planta 2")
- *     Copia el ID de la URL:
- *     https://docs.google.com/spreadsheets/d/<<<ESTE_ID>>>/edit
+ *  Ya no se usan fotos de cierre / levantamiento.
+ *  En el Sheet solo quedan enlaces, nunca base64.
  *
- *  2) Google Drive → Nueva carpeta (ej. "RACS Evidencias Planta 2")
- *     Dentro, opcional: subcarpetas "Fotos", "Firmas", "Cierres"
- *     ID de carpeta:
- *     https://drive.google.com/drive/folders/<<<ESTE_ID>>>
- *
- *  3) Extensiones → Apps Script → pega TODO este archivo
- *  4) Completa CONFIG abajo (SPREADSHEET_ID + FOLDER_*)
- *  5) Ejecuta setupHojas() una vez (autorizar permisos)
- *  6) Implementar → Nueva implementación → Aplicación web
- *       - Ejecutar como: Yo
- *       - Quién tiene acceso: Cualquier persona
- *  7) Copia la URL /exec → pégala en js/config.js → SHEETS_URL
- *
- *  ⚠ No reutilices el mismo despliegue si quieres datos y evidencias
- *    en Sheet/Drive distintos: cada app = Sheet + carpetas + Web App.
+ *  Despliegue: Extensiones → Apps Script → pegar este archivo
+ *  → setupHojas() → Implementar como Aplicación web
+ *  → URL /exec en js/config.js → SHEETS_URL
  * ═══════════════════════════════════════════════════════════════════
  */
 
 // ═════════════════════════════════════════════════════════════════
-// CONFIGURACIÓN — editar por cada app nueva
+// CONFIGURACIÓN
 // ═════════════════════════════════════════════════════════════════
-//
-//  TODA evidencia (foto hallazgo, foto entrega, foto cierre, firma) se guarda como
-//  archivo real en Google Drive. En el Sheet solo quedan enlaces.
-//
-//  Opción A — Una carpeta raíz (recomendado): el script crea subcarpetas
-//    FOLDER_ROOT = 'id_de_carpeta_padre'
-//    (crea: 01_Fotos_Hallazgo / 02_Firmas / 03_Fotos_Cierre / 04_Fotos_Entrega)
-//
-//  Opción B — Carpetas ya creadas a mano:
-//    FOLDER_FOTOS / FOLDER_FIRMAS / FOLDER_CIERRES
-//
 const CONFIG = {
   // Google Sheet de reportes + personal
   // https://docs.google.com/spreadsheets/d/1zDNo5CywCZ5_0DM0R1qfn0q3X50-hhH9TdbLt0GbLZA/edit
   SPREADSHEET_ID: '1zDNo5CywCZ5_0DM0R1qfn0q3X50-hhH9TdbLt0GbLZA',
 
-  // Carpeta raíz de evidencias en Drive (se crean subcarpetas solas)
+  // Carpeta raíz de evidencias en Drive
   // https://drive.google.com/drive/folders/1mueUnOcl-6H-0hhtC39S5hMsgVzQ6UOd
   FOLDER_ROOT: '1mueUnOcl-6H-0hhtC39S5hMsgVzQ6UOd',
-
-  // Vacías: se usan las subcarpetas dentro de FOLDER_ROOT
-  // 01_Fotos_Hallazgo · 02_Firmas · 03_Fotos_Cierre · 04_Fotos_Entrega
-  FOLDER_FOTOS:    '',
-  FOLDER_FIRMAS:   '',
-  FOLDER_CIERRES:  '',
-  FOLDER_ENTREGAS: '',
 
   // Nombres de hojas dentro del spreadsheet
   // gid=1524185369 — pestaña donde se guardan todos los reportes
@@ -64,11 +36,12 @@ const CONFIG = {
   HOJA_REPORTES_GID: 1524185369,
   HOJA_PERSONAL: 'Personal',
 
-  // Nombre del proyecto (solo logs)
-  APP_NAME: 'RACS / Reportes desviación — Casma',
+  APP_NAME: 'Cambio de EPPS — Casma',
 };
 
-// Columnas de la hoja Reportes (orden fijo; el front envía estos campos)
+// Columnas de la hoja Reportes (orden fijo — no reordenar: el Sheet ya tiene este layout).
+// Campos que el formulario ya no pide (nivelRiesgo, causaProbable, dni/área/cargo
+// del reportante, linksFotosLevantamiento) se dejan para no desfasar columnas.
 const COLS_REPORTE = [
   'id', 'estado', 'tipo', 'nivelRiesgo', 'categoria', 'causaProbable',
   'descripcion', 'responsable', 'ubicacion',
@@ -81,7 +54,8 @@ const COLS_REPORTE = [
   'createdAt', 'updatedAt',
   'linksFotosEntrega',
   'jefeInmediato',
-  'cantidadEpps'
+  'cantidadEpps',
+  'itemsEpps'
 ];
 
 // ═════════════════════════════════════════════════════════════════
@@ -146,12 +120,10 @@ function setupHojas() {
   resolverHojaReportes_(ss);
   crearHoja_(ss, CONFIG.HOJA_PERSONAL, ['dni', 'nombre', 'cargo', 'area']);
 
-  // Validar / crear carpetas de evidencias en Drive
   try {
     var folders = resolverCarpetas_();
     Logger.log('Drive FOTOS    → ' + folders.fotos);
     Logger.log('Drive FIRMAS   → ' + folders.firmas);
-    Logger.log('Drive CIERRES  → ' + folders.cierres);
     Logger.log('Drive ENTREGAS → ' + folders.entregas);
   } catch (e) {
     Logger.log('ERROR carpetas Drive: ' + e.message);
@@ -206,38 +178,30 @@ function ensureHeaders_(sh, headers) {
 }
 
 // ═════════════════════════════════════════════════════════════════
-// DRIVE — CADA evidencia se guarda como archivo en Google Drive
+// DRIVE — evidencias como archivo (hallazgo, firma, entrega)
 // ═════════════════════════════════════════════════════════════════
-// Tipos de evidencia:
-//   hallazgo | foto     → FOLDER_FOTOS
-//   entrega             → FOLDER_ENTREGAS (o FOTOS)
-//   cierre | levantamiento → FOLDER_CIERRES (o FOTOS)
-//   firma               → FOLDER_FIRMAS
 
-/** Resuelve IDs de carpetas; si hay FOLDER_ROOT, crea subcarpetas. */
+/** Resuelve IDs de carpetas; crea subcarpetas bajo FOLDER_ROOT. */
 function resolverCarpetas_() {
   var cache = CacheService.getScriptCache();
-  var cached = cache.get('folders_v2');
+  var cached = cache.get('folders_v3');
   if (cached) {
     try { return JSON.parse(cached); } catch (e) { /* ignore */ }
   }
 
-  var out = {
-    fotos: CONFIG.FOLDER_FOTOS,
-    firmas: CONFIG.FOLDER_FIRMAS,
-    cierres: CONFIG.FOLDER_CIERRES || CONFIG.FOLDER_FOTOS,
-    entregas: CONFIG.FOLDER_ENTREGAS || CONFIG.FOLDER_FOTOS
-  };
-
-  if (CONFIG.FOLDER_ROOT && String(CONFIG.FOLDER_ROOT).indexOf('PEGAR') !== 0) {
-    var root = DriveApp.getFolderById(CONFIG.FOLDER_ROOT);
-    out.fotos = ensureSubfolder_(root, '01_Fotos_Hallazgo').getId();
-    out.firmas = ensureSubfolder_(root, '02_Firmas').getId();
-    out.cierres = ensureSubfolder_(root, '03_Fotos_Cierre').getId();
-    out.entregas = ensureSubfolder_(root, '04_Fotos_Entrega').getId();
+  if (!CONFIG.FOLDER_ROOT || String(CONFIG.FOLDER_ROOT).indexOf('PEGAR') === 0) {
+    throw new Error('Configure CONFIG.FOLDER_ROOT (carpeta Drive de evidencias)');
   }
 
-  try { cache.put('folders_v2', JSON.stringify(out), 21600); } catch (e) { /* ignore */ }
+  var root = DriveApp.getFolderById(CONFIG.FOLDER_ROOT);
+  var out = {
+    fotos: ensureSubfolder_(root, '01_Fotos_Hallazgo').getId(),
+    firmas: ensureSubfolder_(root, '02_Firmas').getId(),
+    // 04_ (no 03_): se mantiene el nombre ya creado en Drive; 03_Fotos_Cierre ya no se usa
+    entregas: ensureSubfolder_(root, '04_Fotos_Entrega').getId()
+  };
+
+  try { cache.put('folders_v3', JSON.stringify(out), 21600); } catch (e) { /* ignore */ }
   return out;
 }
 
@@ -259,13 +223,7 @@ function folderIdPara_(tipo, nombreArchivo) {
   ) {
     return folders.entregas || folders.fotos;
   }
-  if (
-    t === 'cierre' || t === 'levantamiento' || t === 'cierre_foto' ||
-    n.indexOf('levantamiento') >= 0 || n.indexOf('_lev') >= 0 || n.indexOf('cierre') >= 0
-  ) {
-    return folders.cierres || folders.fotos;
-  }
-  // hallazgo | foto | evidencia (default)
+  // hallazgo | foto | evidencia (default). Fotos de cierre ya no se piden.
   return folders.fotos;
 }
 
@@ -273,7 +231,7 @@ function folderIdPara_(tipo, nombreArchivo) {
  * Guarda SIEMPRE el archivo en Google Drive.
  * body: {
  *   nombre, mime, data (base64 sin prefijo data:),
- *   tipoEvidencia?: 'hallazgo'|'entrega'|'cierre'|'firma',
+ *   tipoEvidencia?: 'hallazgo'|'entrega'|'firma',
  *   reporteId?: string
  * }
  * Respuesta: { ok, url, id, name, folderId, tipoEvidencia }
@@ -302,7 +260,7 @@ function guardarArchivoDrive_(body, tipo) {
     return {
       ok: false,
       error: 'Carpeta Drive no configurada para evidencia tipo "' + tipoEvidencia +
-        '". Configure FOLDER_ROOT o FOLDER_FOTOS / FOLDER_FIRMAS / FOLDER_CIERRES en Code.gs'
+        '". Configure FOLDER_ROOT en Code.gs'
     };
   }
 
@@ -433,7 +391,7 @@ function getReportes_() {
     headers.forEach(function (h, j) {
       let v = row[j];
       // arrays serializados como JSON o separados por |
-      if ((h === 'linksFotos' || h === 'linksFotosLevantamiento' || h === 'linksFotosEntrega') && typeof v === 'string' && v) {
+      if ((h === 'linksFotos' || h === 'linksFotosLevantamiento' || h === 'linksFotosEntrega' || h === 'itemsEpps') && typeof v === 'string' && v) {
         try {
           if (v.charAt(0) === '[') v = JSON.parse(v);
           else v = v.split('|').filter(Boolean);

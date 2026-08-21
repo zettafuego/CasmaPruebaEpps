@@ -6,9 +6,9 @@
 
 | Evidencia | Carpeta Drive | Qué queda en el Sheet |
 |-----------|---------------|------------------------|
-| Foto hallazgo | `01_Fotos_Hallazgo` (o `FOLDER_FOTOS`) | URL / link |
-| Firma registro o edición | `02_Firmas` (o `FOLDER_FIRMAS`) | URL / link |
-| Foto cierre / levantamiento | `03_Fotos_Cierre` (o `FOLDER_CIERRES`) | URL / link |
+| Foto hallazgo (EPPS viejos) | `01_Fotos_Hallazgo` | URL / link |
+| Firma registro o edición | `02_Firmas` | URL / link |
+| Foto entrega (personal / EPPS nuevos) | `04_Fotos_Entrega` | URL / link |
 
 No se guardan imágenes en base64 en la hoja. Si falla la subida a Drive, el reporte **no** se marca como sincronizado y se reintenta.
 
@@ -30,7 +30,7 @@ Celular / PC (index.html + app.js)
 |--------|-------------------|------------|
 | Front `js/config.js` | `SHEETS_URL` | Solo la URL del backend |
 | Apps Script `CONFIG` | `SPREADSHEET_ID` | Datos tabulares (reportes) |
-| Apps Script `CONFIG` | `FOLDER_FOTOS`, `FOLDER_FIRMAS`, `FOLDER_CIERRES` | Evidencias (imágenes) |
+| Apps Script `CONFIG` | `FOLDER_ROOT` | Evidencias (hallazgo, firmas, entrega) |
 | `localStorage` | `PENDING_KEY`, etc. | Cola offline en el dispositivo |
 
 **Importante:** en el repo original **no venía el Apps Script**. Solo el front con una URL ya desplegada:
@@ -72,11 +72,8 @@ Orden al sincronizar un reporte nuevo:
 
 ### A) En Google Drive
 1. Crea carpeta padre, ej. `CASMA / Apps / MiApp-Evidencias`
-2. Dentro:
-   - `Fotos-Hallazgo`
-   - `Firmas`
-   - `Fotos-Cierre` (opcional)
-3. Copia el **ID** de cada carpeta (barra de la URL después de `/folders/`)
+2. El script crea solo: `01_Fotos_Hallazgo`, `02_Firmas`, `04_Fotos_Entrega`
+3. Copia el **ID** de la carpeta padre (barra de la URL después de `/folders/`) → `FOLDER_ROOT`
 
 ### B) En Google Sheets
 1. Nueva hoja, ej. `CASMA - Reportes MiApp`
@@ -90,10 +87,8 @@ Orden al sincronizar un reporte nuevo:
 
 ```javascript
 const CONFIG = {
-  SPREADSHEET_ID: '1abc....',           // tu sheet NUEVO
-  FOLDER_FOTOS:   '1xyz....',           // evidencias hallazgo
-  FOLDER_FIRMAS:  '1uvw....',           // firmas
-  FOLDER_CIERRES: '1pqr....',           // o '' para usar FOLDER_FOTOS
+  SPREADSHEET_ID: '1abc....',  // tu sheet NUEVO
+  FOLDER_ROOT:    '1xyz....',  // carpeta Drive (crea 01_Fotos_Hallazgo, 02_Firmas, 04_Fotos_Entrega)
   ...
 };
 ```
@@ -117,7 +112,7 @@ const CONFIG = {
 | Recurso | Dónde se ve | Variable |
 |---------|-------------|----------|
 | Sheet | `docs.google.com/spreadsheets/d/**ID**/edit` | `SPREADSHEET_ID` |
-| Carpeta Drive | `drive.google.com/drive/folders/**ID**` | `FOLDER_*` |
+| Carpeta Drive | `drive.google.com/drive/folders/**ID**` | `FOLDER_ROOT` |
 | Web App | `script.google.com/macros/s/**…**/exec` | `SHEETS_URL` (front) |
 
 Plantilla rápida:
@@ -126,9 +121,7 @@ Plantilla rápida:
 APP: .....................
 SHEETS_URL: ..............
 SPREADSHEET_ID: ..........
-FOLDER_FOTOS: ............
-FOLDER_FIRMAS: ...........
-FOLDER_CIERRES: ..........
+FOLDER_ROOT: .............
 PENDING_KEY: .............
 ```
 
@@ -146,7 +139,7 @@ PENDING_KEY: .............
 
 4. **Personal:** llena la hoja `Personal` (columnas `dni`, `nombre`, `cargo`, `area`) o reutiliza una hoja de personal y apúntala en el mismo spreadsheet.
 
-5. **Si solo cambias carpetas de evidencias** pero quieres el **mismo** historial de reportes: deja el mismo `SPREADSHEET_ID` y cambia solo `FOLDER_*`, luego **Nueva versión** del despliegue web (misma URL o nueva según elijas).
+5. **Si solo cambias carpetas de evidencias** pero quieres el **mismo** historial de reportes: deja el mismo `SPREADSHEET_ID` y cambia solo `FOLDER_ROOT`, luego **Nueva versión** del despliegue web (misma URL o nueva según elijas).
 
 6. **Si quieres Sheet y Drive nuevos sin tocar la app vieja:** despliegue **nuevo** + `SHEETS_URL` nueva en un `config.js` de la app nueva.
 

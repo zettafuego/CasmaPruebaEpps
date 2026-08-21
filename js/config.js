@@ -20,7 +20,7 @@
 //   Drive:  1mueUnOcl-6H-0hhtC39S5hMsgVzQ6UOd  (evidencias)
 //   Web App (esta URL):
 const SHEETS_URL =
-  'https://script.google.com/macros/s/AKfycbw3KhMxURZvd5q4GcyV3HcJ0MI_Hx08GV7dZBKS65-LZnag83ZRGUSyP0431pYOKZ1r/exec';
+  'https://script.google.com/macros/s/AKfycbxLjBh7Zz1w7eBbwOGnY8d7nxxCkL3lkbzey9pfdxRORrvsfaK7qBsb1xwBb4fAT8U/exec';
 
 // ── Acciones del Apps Script (query ?action=...) ──────────────────
 const API = {
@@ -62,8 +62,8 @@ const PENDING_UPDATES_KEY = 'seguridad_pending_updates';
 
 // ── App ───────────────────────────────────────────────────────────
 const APP = {
-  title: 'Minera Casma RACS',
-  subtitle: 'Cambios de EPPS · Reportes de desviación',
+  title: 'Minera Casma · Cambio de EPPS',
+  subtitle: 'Vales de almacén · EPPS entregados',
   tagline: 'Cada reporte es inmediato',
   company: 'Compañía Minera Casma SAC',
   ruc: '20606447192',

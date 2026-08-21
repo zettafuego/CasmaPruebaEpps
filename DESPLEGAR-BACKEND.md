@@ -11,9 +11,11 @@
 
 Al sincronizar, el script creará dentro de la carpeta Drive:
 
-- `01_Fotos_Hallazgo`
+- `01_Fotos_Hallazgo` — EPPS viejos
 - `02_Firmas`
-- `03_Fotos_Cierre`
+- `04_Fotos_Entrega` — foto del personal con EPPS nuevos
+
+(`03_Fotos_Cierre` ya no se usa: el formulario no pide fotos de cierre.)
 
 En el Sheet creará (si no existen) las pestañas **Reportes** y **Personal**.
 
@@ -48,7 +50,7 @@ En el Sheet creará (si no existen) las pestañas **Reportes** y **Personal**.
 ### 4. URL en el front — ya configurada
 ```javascript
 const SHEETS_URL =
-  'https://script.google.com/macros/s/AKfycbw3KhMxURZvd5q4GcyV3HcJ0MI_Hx08GV7dZBKS65-LZnag83ZRGUSyP0431pYOKZ1r/exec';
+  'https://script.google.com/macros/s/AKfycbxLjBh7Zz1w7eBbwOGnY8d7nxxCkL3lkbzey9pfdxRORrvsfaK7qBsb1xwBb4fAT8U/exec';
 ```
 Está en `js/config.js`. Solo recarga la app.
 

@@ -32,9 +32,21 @@ const savePersonal=d=>localStorage.setItem(PERSONAL_KEY,JSON.stringify(d));
 const REPORTANTE_DEFAULT='SSOMA';
 
 let selectedTipo='', selectedRiesgo='', selectedEstado='Cerrado';
-const DESC_MIN=80;
+const DESC_MIN=40;
+const TIPOS_EPP=['Casco','Botas','Lentes','Respirador','Guantes','Protector auditivo','Overol','Otro'];
+const TALLA_HINT={
+  Casco:'S / M / L',
+  Botas:'38–45',
+  Lentes:'Única',
+  Respirador:'S / M / L',
+  Guantes:'8 / 9 / 10 / 11',
+  'Protector auditivo':'Única',
+  Overol:'S / M / L / XL',
+  Otro:'talla o modelo'
+};
+let eppItems=[{tipo:'',talla:'',cantidad:1,tipoOtro:''}];
 let photoDataURLs=[], photoLevDataURLs=[], photoEntregaDataURLs=[];
-let filtroRiesgo='', filtroCategoria='', filtroTipo='', filtroEstadoLista='';
+let filtroRiesgo='', filtroCategoria='', filtroTipo='', filtroEstadoLista='', filtroTipoEpp='';
 let filtroUbicacion='', filtroPersona='';
 let editPhotoLevDataURLs=[];
 let currentEditId=null;
@@ -68,6 +80,7 @@ function iniciarAppPrincipal(){
   if(fecha) fecha.value=new Date().toISOString().split('T')[0];
   if(hora) hora.value=new Date().toTimeString().slice(0,5);
   actualizarContadorDesc();
+  renderEppItems();
   setFiltroEstadoBtnActive();
   initFiltroStats();
   updateSyncUI();
@@ -338,7 +351,7 @@ function buscarObservadoPorNombre(){
     dropdown.style.display='none';
     if(!observadoSeleccionado){
       status.className='dni-status notfound';
-      status.textContent='Persona nueva — complete DNI, área y cargo; se guardará al registrar';
+      status.textContent='Solicitante nuevo — complete DNI, área y cargo; se guardará al registrar';
     }
     return;
   }
@@ -353,7 +366,7 @@ function buscarObservadoPorNombre(){
   dropdown.innerHTML = resultados.map((p,i)=>htmlOpcionPersona(p,i,'seleccionarObservado')).join('') + `
     <div onclick="marcarObservadoNuevo()"
          style="padding:10px 14px;cursor:pointer;font-size:12px;color:var(--accent);font-weight:500;background:var(--surface2);">
-      ＋ Usar «${escapeHtml(q)}» como persona nueva
+      ＋ Usar «${escapeHtml(q)}» como solicitante nuevo
     </div>`;
   dropdown._results = resultados;
   dropdown.style.display='block';
@@ -362,7 +375,7 @@ function buscarObservadoPorNombre(){
     status.textContent='✓ '+escapeHtml(observadoSeleccionado.nombre)+' · DNI '+escapeHtml(observadoSeleccionado.dni||'');
   } else {
     status.className='dni-status';
-    status.textContent='Seleccione de la lista (búsqueda por DNI) o cree persona nueva';
+    status.textContent='Seleccione de la lista (búsqueda por DNI) o cree solicitante nuevo';
   }
 }
 
@@ -372,7 +385,7 @@ function marcarObservadoNuevo(){
   observadoSeleccionado=null;
   const status = document.getElementById('observadoStatus');
   status.className='dni-status notfound';
-  status.textContent='Persona nueva — complete DNI, área y cargo';
+  status.textContent='Solicitante nuevo — complete DNI, área y cargo';
   const dni=document.getElementById('dniObservado');
   if(dni) dni.focus();
 }
@@ -407,7 +420,7 @@ function onDniObservadoInput(){
     observadoSeleccionado=null;
     status.className='dni-status notfound';
     status.textContent=dni.length===8
-      ? 'DNI nuevo — complete nombre, área y cargo; se guardará al registrar'
+      ? 'DNI nuevo — complete nombre, área y cargo; se guardará al registrar el vale'
       : 'Sin coincidencia por DNI — siga escribiendo o complete los datos';
     return;
   }
@@ -677,9 +690,117 @@ function actualizarContadorDesc(){
   c.className='desc-counter '+(n>=DESC_MIN?'is-ok':'is-low');
 }
 
+function itemsEppsDe(r){
+  let v=r&&r.itemsEpps;
+  if(typeof v==='string' && v){
+    try{ v=JSON.parse(v); }catch(e){ v=[]; }
+  }
+  return Array.isArray(v)?v.filter(it=>it&&(it.tipo||it.tipoOtro)): [];
+}
+function tipoEppNombre(it){
+  if(!it) return '';
+  const t=String(it.tipo||'').trim();
+  if(t==='Otro') return String(it.tipoOtro||'Otro').trim()||'Otro';
+  return t;
+}
+function textoItemsEpps(r){
+  const items=itemsEppsDe(r);
+  if(!items.length) return '';
+  return items.map(it=>{
+    const nom=tipoEppNombre(it);
+    const talla=String(it.talla||'').trim();
+    const n=parseInt(it.cantidad,10);
+    const cant=Number.isFinite(n)&&n>0?n:1;
+    return nom+(talla?' talla '+talla:'')+' ×'+cant;
+  }).join(' · ');
+}
 function cantidadEppsDe(r){
+  const items=itemsEppsDe(r);
+  if(items.length){
+    const sum=items.reduce((s,it)=>{
+      const n=parseInt(it.cantidad,10);
+      return s+(Number.isFinite(n)&&n>0?n:0);
+    },0);
+    if(sum>0) return sum;
+  }
   const n=parseInt(r&&r.cantidadEpps,10);
   return Number.isFinite(n)&&n>0?n:1;
+}
+function tallaHintEpp(tipo){
+  return TALLA_HINT[tipo]||'talla o modelo';
+}
+function leerItemsEppDelForm(){
+  return eppItems.map(it=>({
+    tipo:String(it.tipo||'').trim(),
+    tipoOtro:String(it.tipoOtro||'').trim(),
+    talla:String(it.talla||'').trim(),
+    cantidad:parseInt(it.cantidad,10)||0
+  }));
+}
+function totalUnidadesEppForm(){
+  return leerItemsEppDelForm().reduce((s,it)=>s+(it.cantidad>0?it.cantidad:0),0);
+}
+function renderEppItems(){
+  const box=document.getElementById('eppItemsList');
+  if(!box) return;
+  if(!eppItems.length) eppItems=[{tipo:'',talla:'',cantidad:1,tipoOtro:''}];
+  box.innerHTML=eppItems.map((it,i)=>{
+    const hint=tallaHintEpp(it.tipo);
+    const opts=TIPOS_EPP.map(t=>`<option value="${t}"${it.tipo===t?' selected':''}>${t}</option>`).join('');
+    return `<div class="epp-row">
+      <div>
+        <label class="form-sublabel">Tipo</label>
+        <select onchange="cambiarItemEpp(${i},'tipo',this.value)">
+          <option value="">— EPP —</option>
+          ${opts}
+        </select>
+      </div>
+      <div>
+        <label class="form-sublabel">Talla</label>
+        <input type="text" value="${escapeHtml(it.talla||'')}" placeholder="${escapeHtml(hint)}"
+               oninput="cambiarItemEpp(${i},'talla',this.value)">
+      </div>
+      <div>
+        <label class="form-sublabel">Cant.</label>
+        <input type="number" min="1" max="99" step="1" inputmode="numeric" value="${it.cantidad||1}"
+               style="width:64px;" oninput="cambiarItemEpp(${i},'cantidad',this.value)">
+      </div>
+      <button type="button" class="epp-row-del" onclick="quitarItemEpp(${i})" aria-label="Quitar EPP">×</button>
+      ${it.tipo==='Otro'?`<div class="epp-row-otro"><label class="form-sublabel">Especifica el EPP</label>
+        <input type="text" value="${escapeHtml(it.tipoOtro||'')}" placeholder="Ej: Barbiquejo, linterna..."
+               oninput="cambiarItemEpp(${i},'tipoOtro',this.value)"></div>`:''}
+    </div>`;
+  }).join('');
+  const tot=document.getElementById('eppItemsTotal');
+  const n=totalUnidadesEppForm();
+  if(tot) tot.textContent='Total: '+n+' unidad'+(n===1?'':'es');
+}
+function cambiarItemEpp(i,campo,val){
+  if(!eppItems[i]) return;
+  if(campo==='cantidad'){
+    const n=parseInt(val,10);
+    eppItems[i].cantidad=Number.isFinite(n)&&n>0?n:1;
+  } else {
+    eppItems[i][campo]=val;
+  }
+  if(campo==='tipo') renderEppItems();
+  else {
+    const tot=document.getElementById('eppItemsTotal');
+    const n=totalUnidadesEppForm();
+    if(tot) tot.textContent='Total: '+n+' unidad'+(n===1?'':'es');
+  }
+}
+function agregarItemEpp(){
+  eppItems.push({tipo:'',talla:'',cantidad:1,tipoOtro:''});
+  renderEppItems();
+}
+function quitarItemEpp(i){
+  if(eppItems.length<=1){
+    eppItems=[{tipo:'',talla:'',cantidad:1,tipoOtro:''}];
+  } else {
+    eppItems.splice(i,1);
+  }
+  renderEppItems();
 }
 
 function fechaKeyDia(f){
@@ -706,41 +827,46 @@ function mapaEppsPorDia(anio, mes){
 /* ───── GUARDAR REPORTE ───── */
 function guardarReporte(){
   if(!selectedEstado)      {showToast('⚠ Selecciona el estado del reporte');return;}
-  if(!selectedTipo)        {showToast('⚠ Selecciona el tipo de reporte');return;}
+  if(!selectedTipo)        {showToast('⚠ Selecciona el motivo (acto o condición)');return;}
   if(!g('categoria'))      {showToast('⚠ Selecciona una categoría');return;}
   if(g('categoria')==='Otro' && !g('categoriaOtro')){showToast('⚠ Describe la categoría en Otro');return;}
-  const desc=g('descripcion');
-  if(!desc){showToast('⚠ Ingresa una descripción detallada del cambio');return;}
-  if(desc.length<DESC_MIN){
-    showToast('⚠ La descripción debe ser más detallada (mínimo '+DESC_MIN+' caracteres)');
+  const itemsOk=leerItemsEppDelForm().filter(it=>it.tipo||it.talla||it.tipoOtro);
+  if(!itemsOk.length || itemsOk.every(it=>!it.tipo)){
+    showToast('⚠ Agrega al menos un EPP entregado (tipo, talla y cantidad)');return;
+  }
+  for(const it of itemsOk){
+    if(!it.tipo){ showToast('⚠ Selecciona el tipo de cada EPP'); return; }
+    if(it.tipo==='Otro' && !it.tipoOtro){ showToast('⚠ Especifica el EPP en Otros'); return; }
+    if(!it.talla){ showToast('⚠ Indica la talla de cada EPP'); return; }
+    if(it.cantidad<1){ showToast('⚠ La cantidad de cada EPP debe ser al menos 1'); return; }
+  }
+  const cant=totalUnidadesEppForm();
+  if(!Number.isFinite(cant) || cant<1){
+    showToast('⚠ Indica cuántos EPPS se entregan (mínimo 1)');
     return;
   }
-  const cant=parseInt(g('cantidadEpps'),10);
-  if(!Number.isFinite(cant) || cant<1){
-    showToast('⚠ Indica cuántos EPPS se cambian (mínimo 1)');
+  const desc=g('descripcion');
+  if(!desc){showToast('⚠ Ingresa el motivo u observación del cambio');return;}
+  if(desc.length<DESC_MIN){
+    showToast('⚠ La observación debe tener mínimo '+DESC_MIN+' caracteres');
     return;
   }
 
-  if(!g('responsable'))    {showToast('⚠ Ingresa el responsable de la acción correctiva');return;}
+  if(!g('responsable'))    {showToast('⚠ Ingresa el responsable de almacén');return;}
   if(!g('jefeInmediato'))  {showToast('⚠ Ingresa el jefe inmediato');return;}
   if(!g('ubicacion'))      {showToast('⚠ Selecciona el Área / Ubicación');return;}
   if(g('ubicacion')==='Otros' && !g('ubicacionOtros')){showToast('⚠ Especifica la ubicación');return;}
-  if(!g('areaReportado'))  {showToast('⚠ Indica el área de la persona reportada');return;}
+  if(!g('dniObservado') || g('dniObservado').length!==8){
+    showToast('⚠ Ingresa el DNI (8 dígitos) de quien solicita el cambio');return;
+  }
+  if(!g('persona'))        {showToast('⚠ Ingresa quién solicita el cambio / recibe el EPP');return;}
+  if(!g('areaReportado'))  {showToast('⚠ Indica el área de quien solicita el cambio');return;}
   if(!g('fecha'))          {showToast('⚠ Ingresa la fecha');return;}
   if(!g('hora'))           {showToast('⚠ Ingresa la hora');return;}
-  // Persona reportada: si hay nombre o DNI parcial, pedir datos mínimos
-  if(g('dniObservado') && g('dniObservado').length!==8){
-    showToast('⚠ El DNI de la persona reportada debe tener 8 dígitos o dejarse vacío');
-    return;
-  }
-  if(g('persona') && !g('dniObservado') && !g('areaReportado')){
-    showToast('⚠ Complete área (y DNI si puede) de la persona reportada');
-    return;
-  }
 
   if(!getFirmaDataURL('firmaCanvas')){showToast('⚠ Dibuja tu firma para continuar');return;}
   if(!photoEntregaDataURLs.length){
-    showToast('⚠ Toma la foto del personal que recibe el EPP');
+    showToast('⚠ Toma la foto de quien recibe el EPP con los EPPS nuevos');
     return;
   }
 
@@ -762,6 +888,7 @@ function guardarReporte(){
     causaProbable:causaSeleccionadaValor,
     descripcion:desc,
     cantidadEpps:cant,
+    itemsEpps:itemsOk,
     responsable:g('responsable'),
     jefeInmediato:g('jefeInmediato'),
     ubicacion:g('ubicacion')==='Otros'?g('ubicacionOtros'):g('ubicacion')==='Interior Mina'&&g('ubicacionInterior')?'Interior Mina - '+g('ubicacionInterior'):g('ubicacion'),
@@ -838,8 +965,8 @@ function resetForm(){
    'areaReportado','ubicacionOtros','medidasAcciones'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
-  const cantEl=document.getElementById('cantidadEpps');
-  if(cantEl) cantEl.value='1';
+  eppItems=[{tipo:'',talla:'',cantidad:1,tipoOtro:''}];
+  renderEppItems();
   actualizarContadorDesc();
   ['categoria','ubicacion'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
@@ -872,13 +999,13 @@ function resetForm(){
 /* ───── FILTROS DE LISTA ───── */
 function limpiarFiltros(){
   filtroRiesgo=''; filtroCategoria=''; filtroTipo='';
-  filtroUbicacion=''; filtroPersona='';
+  filtroUbicacion=''; filtroPersona=''; filtroTipoEpp='';
   renderReportes();
 }
 
 function limpiarFiltrosStats(){
   filtroRiesgo=''; filtroCategoria=''; filtroTipo='';
-  filtroUbicacion=''; filtroPersona='';
+  filtroUbicacion=''; filtroPersona=''; filtroTipoEpp='';
   renderStats();
 }
 
@@ -907,8 +1034,8 @@ function renderReportes(){
   const banner=document.getElementById('filtroActivoBanner');
   const texto=document.getElementById('filtroActivoTexto');
   if(banner && texto){
-    if(filtroRiesgo){ banner.style.display='flex'; texto.textContent='Filtro: Riesgo '+filtroRiesgo; }
-    else if(filtroCategoria){ banner.style.display='flex'; texto.textContent='Filtro: '+filtroCategoria; }
+    if(filtroCategoria){ banner.style.display='flex'; texto.textContent='Filtro: '+filtroCategoria; }
+    else if(filtroTipoEpp){ banner.style.display='flex'; texto.textContent='Filtro: EPP '+filtroTipoEpp; }
     else { banner.style.display='none'; }
   }
   let data=getReportes();
@@ -918,43 +1045,46 @@ function renderReportes(){
     (r.descripcion||'').toLowerCase().includes(q)||
     (r.ubicacion||'').toLowerCase().includes(q)||
     (r.categoria||'').toLowerCase().includes(q)||
-    (r.reportador||'').toLowerCase().includes(q)||
+    (r.persona||'').toLowerCase().includes(q)||
+    (r.dniObservado||'').toLowerCase().includes(q)||
     (r.responsable||'').toLowerCase().includes(q)||
-    (r.jefeInmediato||'').toLowerCase().includes(q)
+    (r.jefeInmediato||'').toLowerCase().includes(q)||
+    textoItemsEpps(r).toLowerCase().includes(q)
   );
   if(tipo) data=data.filter(r=>r.tipo===tipo);
-  if(filtroRiesgo) data=data.filter(r=>r.nivelRiesgo===filtroRiesgo);
   if(filtroCategoria) data=data.filter(r=>r.categoria===filtroCategoria);
   if(filtroTipo) data=data.filter(r=>r.tipo===filtroTipo);
+  if(filtroTipoEpp) data=data.filter(r=>itemsEppsDe(r).some(it=>tipoEppNombre(it)===filtroTipoEpp));
   if(filtroEstadoLista) data=data.filter(r=>(r.estado||'Abierto')===filtroEstadoLista);
 
   if(!data.length){
-    list.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><h3>Sin reportes</h3><p style="font-size:13px;">Los reportes guardados aparecerán aquí</p></div>`;
+    list.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><h3>Sin vales</h3><p style="font-size:13px;">Los cambios de EPPS aparecerán aquí</p></div>`;
     return;
   }
 
-  const badgeMap={'Acto Subestándar':'badge-act','Condición Subestándar':'badge-cond','Casi Accidente':'badge-near'};
-  const riskMap={'Alto':'risk-alto','Medio':'risk-medio','Bajo':'risk-bajo'};
-  const labelMap={'Acto Subestándar':'ACTO','Condición Subestándar':'COND','Casi Accidente':'CASI'};
+  const badgeMap={'Acto Subestándar':'badge-act','Condición Subestándar':'badge-cond'};
+  const labelMap={'Acto Subestándar':'ACTO','Condición Subestándar':'COND'};
 
   list.innerHTML=data.map(r=>{
     const estado=r.estado||'Abierto';
     const estClass=estado==='Cerrado'?'estado-cerrado':'estado-abierto';
+    const eppsTxt=textoItemsEpps(r);
+    const sol=personaSolicitaDe(r);
     return `
     <div class="report-card" onclick="openModal('${r.id}')">
       <div class="report-card-header">
-        <div class="risk-dot ${riskMap[r.nivelRiesgo]||'risk-bajo'}"></div>
-        <div class="report-title">${escapeHtml((r.descripcion||'').slice(0,80))}${(r.descripcion||'').length>80?'…':''}</div>        <span class="report-type-badge ${badgeMap[r.tipo]||'badge-both'}">${labelMap[r.tipo]||r.tipo}</span>
+        <div class="report-title">${escapeHtml(eppsTxt||(r.descripcion||'').slice(0,80))}${(eppsTxt||r.descripcion||'').length>80?'…':''}</div>
+        <span class="report-type-badge ${badgeMap[r.tipo]||'badge-both'}">${labelMap[r.tipo]||escapeHtml(r.tipo||'EPPS')}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <span class="estado-badge ${estClass}"><span class="estado-dot"></span>${estado}</span>
-        <span style="font-size:12px;color:var(--text3);font-family:var(--mono);">${fmtFecha(r.fecha)}</span>
+        <span style="font-size:12px;color:var(--text3);font-family:var(--mono);">${fmtFecha(r.fecha)} · ${cantidadEppsDe(r)} EPP</span>
       </div>
       <div class="report-meta">
+        ${sol.nombre?`<span>👤 ${escapeHtml(sol.nombre)}</span>`:''}
         ${r.ubicacion?`<span>📍 ${escapeHtml(r.ubicacion)}</span>`:''}
         ${r.categoria?`<span>🏷 ${escapeHtml(r.categoria)}</span>`:''}
-        ${r.jefeInmediato?`<span>👔 ${escapeHtml(r.jefeInmediato)}</span>`:''}
-        <span>👤 ${escapeHtml(r.reportador||REPORTANTE_DEFAULT)}</span>
+        ${r.responsable?`<span>🏬 ${escapeHtml(r.responsable)}</span>`:''}
       </div>
       <div class="sync-status ${r.synced?'status-synced':'status-pending'}">
         <div class="dot"></div>${r.synced?'Sincronizado':'Pendiente de sincronizar'}
@@ -1007,6 +1137,23 @@ function logoPrintSrc(){
   }
 }
 
+/** Quién solicita el cambio / recibe el EPP. */
+function personaSolicitaDe(r){
+  return {
+    nombre: String(r&&r.persona||'').trim(),
+    dni: String(r&&r.dniObservado||'').trim(),
+    area: String(r&&r.areaReportado||'').trim(),
+    cargo: String(r&&r.cargoReportado||'').trim(),
+  };
+}
+function htmlPersonaSolicitaCorta(r){
+  const p=personaSolicitaDe(r);
+  if(!p.nombre && !p.dni) return '—';
+  const nom=escapeHtml(p.nombre||'—');
+  if(!p.dni) return nom;
+  return nom+' <span style="font-family:monospace;color:#555;">DNI '+escapeHtml(p.dni)+'</span>';
+}
+
 
 
 // Convierte link de Drive a URL embebible para firmas
@@ -1043,33 +1190,36 @@ function driveImgUrl(url){
 function openModal(id){
   const r=getReportes().find(x=>x.id===id);
   if(!r) return;
-  const rc={'Alto':'var(--danger)','Medio':'var(--warning)','Bajo':'var(--success)'};
-  const color=rc[r.nivelRiesgo]||'var(--text2)';
   const estado=r.estado||'Abierto';
   const estColor=estado==='Cerrado'?'var(--success)':'var(--danger)';
   const row=(label,val,full)=>val?`<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value"${full?' style="text-align:left;flex:1;margin-left:16px;"':''}>${val}</span></div>`:'';
   const sec=t=>`<div class="detail-section">${t}</div>`;
+  const sol=personaSolicitaDe(r);
+  const items=itemsEppsDe(r);
+  const itemsHtml=items.length
+    ? items.map(it=>escapeHtml(tipoEppNombre(it)+(it.talla?' · talla '+it.talla:'')+' ×'+(parseInt(it.cantidad,10)||1))).join('<br>')
+    : escapeHtml(String(cantidadEppsDe(r))+' unidad(es)');
 
   const fotosHallazgo=toArray(r.fotos).length?toArray(r.fotos):toArray(r.linksFotos);
   const fotosEntrega=toArray(r.fotosEntrega).length?toArray(r.fotosEntrega):toArray(r.linksFotosEntrega);
   const fotosLev=toArray(r.fotosLevantamiento).length?toArray(r.fotosLevantamiento):toArray(r.linksFotosLevantamiento);
 
   document.getElementById('modalContent').innerHTML=`
-    <div class="modal-title">${escapeHtml(r.tipo)}</div>
+    <div class="modal-title">Cambio de EPPS</div>
     <div class="detail-row"><span class="detail-label">Estado</span><span class="detail-value" style="color:${estColor};font-weight:600;">● ${escapeHtml(estado)}</span></div>
-    ${row('Nivel de riesgo',`<span style="color:${color};font-weight:500">● ${escapeHtml(r.nivelRiesgo)}</span>`)}
+    ${row('Motivo (acto / condición)',escapeHtml(r.tipo))}
     ${row('Categoría',escapeHtml(r.categoria))}
-    ${row('EPPS cambiados', String(cantidadEppsDe(r)))}
-    ${row('Descripción',escapeHtml(r.descripcion),true)}
-    ${row('Responsable de acción',escapeHtml(r.responsable))}
+    ${row('EPPS entregados', itemsHtml, true)}
+    ${row('Observaciones',escapeHtml(r.descripcion),true)}
+    ${row('Responsable de almacén',escapeHtml(r.responsable))}
     ${row('Jefe inmediato',escapeHtml(r.jefeInmediato))}
-    ${sec('Lugar / Persona reportada')}
+    ${sec('Quién solicita / recibe el EPP')}
     ${row('Área / Ubicación',escapeHtml(r.ubicacion))}
-    ${row('Persona reportada',escapeHtml(r.persona))}
-    ${row('DNI observado',escapeHtml(r.dniObservado))}
-    ${row('Área del observado',escapeHtml(r.areaReportado))}
-    ${row('Cargo del observado',escapeHtml(r.cargoReportado))}
-    ${row('Reportante',escapeHtml(r.reportador||REPORTANTE_DEFAULT))}
+    ${row('Solicitante',escapeHtml(sol.nombre))}
+    ${row('DNI',escapeHtml(sol.dni))}
+    ${row('Área del solicitante',escapeHtml(sol.area))}
+    ${row('Cargo del solicitante',escapeHtml(sol.cargo))}
+    ${row('Registrado por',escapeHtml(r.reportador||REPORTANTE_DEFAULT))}
     ${row('Fecha',fmtFecha(r.fecha))}
     ${estado==='Cerrado'?sec('Cierre'):''}
     ${estado==='Cerrado'&&r.medidasAcciones?row('Acciones realizadas',escapeHtml(r.medidasAcciones),true):''}
@@ -1077,8 +1227,8 @@ function openModal(id){
     <div class="detail-row"><span class="detail-label">Sincronización</span>
       <span class="detail-value ${r.synced?'status-synced':'status-pending'}">${r.synced?'✓ Sincronizado':'⏳ Pendiente'}</span>
     </div>
-    ${fotosHallazgo.length?`<div style="margin-top:14px;"><div class="section-title">Fotos del hallazgo (${fotosHallazgo.length})</div><div class="photos-modal-grid">${fotosHallazgo.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
-    ${fotosEntrega.length?`<div style="margin-top:14px;"><div class="section-title">Fotos del personal (${fotosEntrega.length})</div><div class="photos-modal-grid">${fotosEntrega.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
+    ${fotosHallazgo.length?`<div style="margin-top:14px;"><div class="section-title">Fotos de EPPS retirados (${fotosHallazgo.length})</div><div class="photos-modal-grid">${fotosHallazgo.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
+    ${fotosEntrega.length?`<div style="margin-top:14px;"><div class="section-title">Fotos de quien recibe el EPP (${fotosEntrega.length})</div><div class="photos-modal-grid">${fotosEntrega.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
     ${fotosLev.length?`<div style="margin-top:14px;"><div class="section-title">Fotos de cierre (${fotosLev.length})</div><div class="photos-modal-grid">${fotosLev.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
     ${firmaImgUrl(r.firmaRegistro)?'<div style="margin-top:14px;"><div class="section-title">Firma Registrador</div><img src="'+firmaImgUrl(r.firmaRegistro)+'" style="max-width:200px;border-bottom:1px solid var(--border2);" onerror="this.style.display=\'none\'"></div>':''}
     ${firmaImgUrl(r.firmaEdicion)?'<div style="margin-top:10px;"><div class="section-title">Firma Editor</div><img src="'+firmaImgUrl(r.firmaEdicion)+'" style="max-width:200px;border-bottom:1px solid var(--border2);" onerror="this.style.display=\'none\'"></div>':''}
@@ -1115,13 +1265,13 @@ function abrirEdicion(id){
   closeModalBtn();
 
   document.getElementById('editModalContent').innerHTML=`
-    <div class="modal-title">Editar reporte</div>
+    <div class="modal-title">Editar vale</div>
     <div class="edit-info-card">
-      <div><strong>Tipo:</strong> ${escapeHtml(r.tipo)}</div>
+      <div><strong>Solicitante:</strong> ${escapeHtml(r.persona||'—')}</div>
+      <div><strong>EPPS:</strong> ${escapeHtml(textoItemsEpps(r)||(cantidadEppsDe(r)+' unidad(es)'))}</div>
       <div><strong>Categoría:</strong> ${escapeHtml(r.categoria||'—')}</div>
-      <div><strong>Jefe inmediato:</strong> ${escapeHtml(r.jefeInmediato||'—')}</div>
       <div><strong>Lugar:</strong> ${escapeHtml(r.ubicacion||'—')}</div>
-      <div><strong>Descripción:</strong> ${escapeHtml((r.descripcion||'').slice(0,100))}${(r.descripcion||'').length>100?'…':''}</div>
+      <div><strong>Observaciones:</strong> ${escapeHtml((r.descripcion||'').slice(0,100))}${(r.descripcion||'').length>100?'…':''}</div>
     </div>
 
     <div class="form-section">
@@ -1348,8 +1498,8 @@ function descargarPendientes(){
 </style>
 </head><body>
 <div class="header">
-  <h1>CAMBIO DE EPPS — Pendientes por levantar</h1>
-  <p>Minera Casma · Cambios de EPPS con acciones correctivas abiertas</p>
+  <h1>CAMBIO DE EPPS — Pendientes por cerrar</h1>
+  <p>Minera Casma · Vales de EPPS abiertos</p>
 </div>
 <div class="meta">
   <span><strong>Generado:</strong> ${fechaTxt} ${horaTxt}</span>
@@ -1362,14 +1512,13 @@ function descargarPendientes(){
 </div>
 ${grupos.map(g=>{
   const filas=g.reportes.map((r,i)=>{
-    const riesgoClass=r.nivelRiesgo==='Alto'?'riesgo-alto':(r.nivelRiesgo==='Medio'?'riesgo-medio':'riesgo-bajo');
     return `<tr>
       <td style="text-align:center;color:#888;">${i+1}</td>
       <td>${escapeHtml(r.fecha||'')}</td>
-      <td>${escapeHtml(r.tipo||'—')}</td>
       <td>${escapeHtml(r.categoria||'—')}</td>
-      <td><span class="${riesgoClass}">${escapeHtml(r.nivelRiesgo||'—')}</span></td>
+      <td>${escapeHtml(textoItemsEpps(r)||(cantidadEppsDe(r)+' EPP'))}</td>
       <td>${escapeHtml(r.ubicacion||'—')}</td>
+      <td>${htmlPersonaSolicitaCorta(r)}</td>
       <td>${escapeHtml((r.descripcion||'').slice(0,140))}${(r.descripcion||'').length>140?'…':''}</td>
     </tr>`;
   }).join('');
@@ -1382,11 +1531,11 @@ ${grupos.map(g=>{
       <thead><tr>
         <th style="width:30px;">#</th>
         <th style="width:75px;">Fecha</th>
-        <th style="width:90px;">Tipo</th>
         <th style="width:120px;">Categoría</th>
-        <th style="width:55px;">Riesgo</th>
+        <th style="width:160px;">EPPS entregados</th>
         <th style="width:90px;">Ubicación</th>
-        <th>Descripción</th>
+        <th style="width:140px;">Solicitante</th>
+        <th>Observaciones</th>
 
       </tr></thead>
       <tbody>${filas}</tbody>
@@ -1466,9 +1615,9 @@ function getReportesDelPeriodo(){
 
 function getReportesFiltrados(){
   let data = getReportesDelPeriodo();
-  if(filtroRiesgo) data = data.filter(r => r.nivelRiesgo === filtroRiesgo);
   if(filtroCategoria) data = data.filter(r => r.categoria === filtroCategoria);
   if(filtroTipo) data = data.filter(r => r.tipo === filtroTipo);
+  if(filtroTipoEpp) data = data.filter(r => itemsEppsDe(r).some(it=>tipoEppNombre(it)===filtroTipoEpp));
   if(filtroUbicacion) data = data.filter(r => areaCambioDe(r)===filtroUbicacion);
   if(filtroPersona) data = data.filter(r => personaKey(r)===filtroPersona);
   return data;
@@ -1504,27 +1653,28 @@ function rankingPersonas(list){
     const nom=String(r.persona||'').trim();
     const dni=String(r.dniObservado||'').trim();
     if(!map.has(key)){
-      map.set(key,{key, nombre:nom||(dni?'DNI '+dni:'Sin nombre'), dni, area:String(r.areaReportado||'').trim(), count:0});
+      map.set(key,{key, nombre:nom||(dni?'DNI '+dni:'Sin nombre'), dni, area:String(r.areaReportado||'').trim(), count:0, epps:0});
     }
     const o=map.get(key);
     o.count++;
+    o.epps+=cantidadEppsDe(r);
     if(nom) o.nombre=nom;
     if(r.areaReportado) o.area=String(r.areaReportado).trim();
   });
-  return [...map.values()].sort((a,b)=>b.count-a.count);
+  return [...map.values()].sort((a,b)=>(b.epps||b.count)-(a.epps||a.count) || b.count-a.count);
 }
 
 function filtrarPorUbicacion(val){
   const v=val||'';
   if(filtroUbicacion===v) filtroUbicacion='';
-  else { filtroUbicacion=v; filtroPersona=''; filtroCategoria=''; filtroRiesgo=''; filtroTipo=''; }
+  else { filtroUbicacion=v; filtroPersona=''; filtroCategoria=''; filtroRiesgo=''; filtroTipo=''; filtroTipoEpp=''; }
   renderStats();
 }
 
 function filtrarPorPersona(val){
   const v=val||'';
   if(filtroPersona===v) filtroPersona='';
-  else { filtroPersona=v; filtroUbicacion=''; filtroCategoria=''; filtroRiesgo=''; filtroTipo=''; }
+  else { filtroPersona=v; filtroUbicacion=''; filtroCategoria=''; filtroRiesgo=''; filtroTipo=''; filtroTipoEpp=''; }
   renderStats();
 }
 
@@ -1598,19 +1748,19 @@ function drawPieChart(cats, total){
 
 function filtrarPorTipo(tipo){
   if(filtroTipo===tipo){ filtroTipo=''; }
-  else { filtroTipo=tipo; filtroRiesgo=''; filtroCategoria=''; filtroUbicacion=''; filtroPersona=''; }
+  else { filtroTipo=tipo; filtroRiesgo=''; filtroCategoria=''; filtroUbicacion=''; filtroPersona=''; filtroTipoEpp=''; }
   renderStats();
 }
 
-function filtrarPorRiesgo(nivel){
-  if(filtroRiesgo===nivel){ filtroRiesgo=''; }
-  else { filtroRiesgo=nivel; filtroCategoria=''; filtroUbicacion=''; filtroPersona=''; }
+function filtrarPorTipoEpp(tipo){
+  if(filtroTipoEpp===tipo){ filtroTipoEpp=''; }
+  else { filtroTipoEpp=tipo; filtroRiesgo=''; filtroCategoria=''; filtroUbicacion=''; filtroPersona=''; filtroTipo=''; }
   renderStats();
 }
 
 function filtrarPorCategoria(cat){
   if(filtroCategoria===cat){ filtroCategoria=''; }
-  else { filtroCategoria=cat; filtroRiesgo=''; filtroUbicacion=''; filtroPersona=''; }
+  else { filtroCategoria=cat; filtroRiesgo=''; filtroUbicacion=''; filtroPersona=''; filtroTipoEpp=''; }
   renderStats();
 }
 
@@ -1629,18 +1779,16 @@ function renderStats(){
   const bannerFiltro = document.getElementById('statsFiltroActivo');
   const textoFiltro = document.getElementById('statsFiltroTexto');
   if(bannerFiltro && textoFiltro){
-    if(filtroTipo){ bannerFiltro.style.display='flex'; textoFiltro.textContent='🔍 Filtrado por tipo: '+filtroTipo; }
-    else if(filtroRiesgo){ bannerFiltro.style.display='flex'; textoFiltro.textContent='🔍 Filtrado por riesgo: '+filtroRiesgo; }
+    if(filtroTipo){ bannerFiltro.style.display='flex'; textoFiltro.textContent='🔍 Filtrado por motivo: '+filtroTipo; }
+    else if(filtroTipoEpp){ bannerFiltro.style.display='flex'; textoFiltro.textContent='🔍 Filtrado por EPP: '+filtroTipoEpp; }
     else if(filtroCategoria){ bannerFiltro.style.display='flex'; textoFiltro.textContent='🔍 Filtrado por clasificación: '+filtroCategoria; }
     else if(filtroUbicacion){ bannerFiltro.style.display='flex'; textoFiltro.textContent='🔍 Filtrado por área: '+filtroUbicacion; }
-    else if(filtroPersona){ bannerFiltro.style.display='flex'; textoFiltro.textContent='🔍 Filtrado por persona'; }
+    else if(filtroPersona){ bannerFiltro.style.display='flex'; textoFiltro.textContent='🔍 Filtrado por solicitante'; }
     else { bannerFiltro.style.display='none'; }
   }
 
   const total = reportes.length;
   const actos = reportes.filter(r=>r.tipo==='Acto Subestándar').length;
-  const casi  = reportes.filter(r=>r.tipo==='Casi Accidente').length;
-  const altos = reportes.filter(r=>r.nivelRiesgo==='Alto').length;
   const abiertos = reportes.filter(r=>(r.estado||'Abierto')==='Abierto').length;
   const cerrados = reportes.filter(r=>r.estado==='Cerrado').length;
 
@@ -1731,10 +1879,10 @@ function renderStats(){
 
   const grid=document.getElementById('statsGrid');
   if(grid) grid.innerHTML=`
-    <div class="stat-card"><div class="stat-num">${eppsPeriodo}</div><div class="stat-label">EPPS cambiados</div></div>
-    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Registros</div></div>
+    <div class="stat-card"><div class="stat-num">${eppsPeriodo}</div><div class="stat-label">EPPS entregados</div></div>
+    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Vales</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--success)">${cerrados}</div><div class="stat-label">Cerrados</div></div>
-    <div class="stat-card"><div class="stat-num" style="color:var(--danger)">${altos}</div><div class="stat-label">Riesgo Alto</div></div>`;
+    <div class="stat-card"><div class="stat-num" style="color:var(--danger)">${abiertos}</div><div class="stat-label">Abiertos</div></div>`;
 
   const basePeriodo=getReportesDelPeriodo();
   const totalPeriodo=basePeriodo.length||1;
@@ -1758,7 +1906,7 @@ function renderStats(){
       </div>`;
     top3.innerHTML=
       card('Área con más cambios', topArea?topArea[0]:'', topArea?topArea[1]:0, topArea?`cambio${topArea[1]===1?'':'s'} · ${Math.round(topArea[1]/totalPeriodo*100)}%`:'del período')+
-      card('Más incidencias', topPersona?topPersona.nombre:'', topPersona?topPersona.count:0, topPersona?`incidencia${topPersona.count===1?'':'s'}`:'sin persona')+
+      card('Más cambios de EPPS', topPersona?topPersona.nombre:'', topPersona?topPersona.epps||topPersona.count:0, topPersona?`EPP${(topPersona.epps||topPersona.count)===1?'':'S'} · ${topPersona.count} vale${topPersona.count===1?'':'s'}`:'sin solicitante')+
       card('Clasificación más recurrente', topClasif?topClasif[0]:'', topClasif?topClasif[1]:0, topClasif?`${Math.round(topClasif[1]/totalPeriodo*100)}% de los cambios`:'del período');
   }
 
@@ -1778,7 +1926,7 @@ function renderStats(){
       : '<p style="color:var(--text3);font-size:13px;">Sin áreas registradas en este período</p>';
   }
 
-  const maxPer=personasRank[0]?.count||1;
+  const maxPer=personasRank[0]?.epps||personasRank[0]?.count||1;
   const elPers=document.getElementById('statsPersonas');
   if(elPers){
     elPers.innerHTML=personasRank.length
@@ -1787,12 +1935,12 @@ function renderStats(){
           <div class="rank-pos">${i+1}</div>
           <div class="rank-body">
             <div class="rank-name">${escapeHtml(p.nombre)}</div>
-            <div class="rank-sub">${escapeHtml([p.dni?('DNI '+p.dni):'', p.area].filter(Boolean).join(' · ')||'Persona reportada')}</div>
-            <div class="rank-bar"><span style="width:${Math.round(p.count/maxPer*100)}%"></span></div>
+            <div class="rank-sub">${escapeHtml([p.dni?('DNI '+p.dni):'', p.area].filter(Boolean).join(' · ')||'Solicitante')} · ${p.count} vale${p.count===1?'':'s'}</div>
+            <div class="rank-bar"><span style="width:${Math.round((p.epps||p.count)/Math.max(personasRank[0]?.epps||maxPer,1)*100)}%"></span></div>
           </div>
-          <div class="rank-count">${p.count}</div>
+          <div class="rank-count">${p.epps||p.count}</div>
         </div>`).join('')
-      : '<p style="color:var(--text3);font-size:13px;">Sin personas reportadas en este período</p>';
+      : '<p style="color:var(--text3);font-size:13px;">Sin solicitantes en este período</p>';
   }
 
   const maxCla=clasifRank[0]?.[1]||1;
@@ -1831,10 +1979,11 @@ function renderStats(){
       <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${Math.round(cerrados/maxEst*100)}%;background:var(--success);border-radius:3px;"></div></div>
     </div>`;
 
-  // Por tipo
-  const tipoMap={'Acto Subestándar':['var(--danger)',actos],'Condición Subestándar':['var(--warning)',reportes.filter(r=>r.tipo==='Condición Subestándar').length],'Casi Accidente':['var(--purple)',casi]};
+  // Por motivo (acto / condición)
+  const tipoMap={'Acto Subestándar':['var(--danger)',actos],'Condición Subestándar':['var(--warning)',reportes.filter(r=>r.tipo==='Condición Subestándar').length]};
   const maxTipo = Math.max(...Object.values(tipoMap).map(v=>v[1]),1);
-  document.getElementById('statsTipo').innerHTML = Object.entries(tipoMap).map(([tipo,[color,count]])=>`
+  const elTipo=document.getElementById('statsTipo');
+  if(elTipo) elTipo.innerHTML = Object.entries(tipoMap).map(([tipo,[color,count]])=>`
     <div onclick="filtrarPorTipo('${tipo}')" style="margin-bottom:10px;cursor:pointer;padding:8px;border-radius:var(--radius-sm);border:1px solid ${filtroTipo===tipo?color:'transparent'};background:${filtroTipo===tipo?'rgba(255,255,255,0.04)':'transparent'};transition:all 0.2s;">
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;align-items:center;">
         <span style="color:${color};font-weight:500;">${tipo}</span>
@@ -1849,23 +1998,31 @@ function renderStats(){
     </div>`
   ).join('') || '<p style="color:var(--text3);font-size:13px;">Sin datos aún</p>';
 
-  // Por nivel de riesgo
-  const riesgoMap={'Alto':['var(--danger)',altos],'Medio':['var(--warning)',reportes.filter(r=>r.nivelRiesgo==='Medio').length],'Bajo':['var(--success)',reportes.filter(r=>r.nivelRiesgo==='Bajo').length]};
-  const maxRiesgo = Math.max(...Object.values(riesgoMap).map(v=>v[1]),1);
-  document.getElementById('statsRiesgo').innerHTML = Object.entries(riesgoMap).map(([nivel,[color,count]])=>`
-    <div onclick="filtrarPorRiesgo('${nivel}')" style="margin-bottom:10px;cursor:pointer;padding:8px;border-radius:var(--radius-sm);border:1px solid ${filtroRiesgo===nivel?color:'transparent'};background:${filtroRiesgo===nivel?'rgba(255,255,255,0.04)':'transparent'};transition:all 0.2s;">
-      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;align-items:center;">
-        <span style="color:${color};font-weight:500;">● ${nivel}</span>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-family:var(--mono);color:var(--text2);">${count}</span>
-          ${filtroRiesgo===nivel?`<span style="font-size:10px;background:${color};color:#fff;padding:2px 6px;border-radius:10px;font-weight:600;">filtrado</span>`:''}
-        </div>
-      </div>
-      <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">
-        <div style="height:100%;width:${Math.round(count/maxRiesgo*100)}%;background:${color};border-radius:3px;transition:width 0.4s;"></div>
-      </div>
-    </div>`
-  ).join('');
+  const eppTipoMap={};
+  reportes.forEach(r=>{
+    itemsEppsDe(r).forEach(it=>{
+      const nom=tipoEppNombre(it);
+      if(!nom) return;
+      const n=parseInt(it.cantidad,10);
+      eppTipoMap[nom]=(eppTipoMap[nom]||0)+(Number.isFinite(n)&&n>0?n:1);
+    });
+  });
+  const eppTipoRank=Object.entries(eppTipoMap).sort((a,b)=>b[1]-a[1]);
+  const maxEppTipo=eppTipoRank[0]?.[1]||1;
+  const elTipoEpp=document.getElementById('statsTipoEpp');
+  if(elTipoEpp){
+    elTipoEpp.innerHTML=eppTipoRank.length
+      ? eppTipoRank.map(([tipo,count],i)=>`
+        <div class="rank-row${i===0?' is-top':''}${filtroTipoEpp===tipo?' is-active':''}" onclick="filtrarPorTipoEpp(decodeURIComponent('${encodeURIComponent(tipo)}'))">
+          <div class="rank-pos">${i+1}</div>
+          <div class="rank-body">
+            <div class="rank-name">${escapeHtml(tipo)}</div>
+            <div class="rank-bar"><span style="width:${Math.round(count/maxEppTipo*100)}%"></span></div>
+          </div>
+          <div class="rank-count">${count}</div>
+        </div>`).join('')
+      : '<p style="color:var(--text3);font-size:13px;">Sin EPPS tipificados en este período (los vales anteriores solo tienen cantidad total)</p>';
+  }
 
   // Por categoría (barras + torta)
   const cats={};
@@ -2400,6 +2557,8 @@ function generarVale(id){
   const firmaThumb=u=>{if(!u||u==='null'||u.trim()==='')return'';if(u.startsWith('data:'))return u;const m=u.match(/[?&]id=([\w-]+)/)||u.match(/\/d\/([\w-]+)/);return m?'https://lh3.googleusercontent.com/d/'+m[1]+'=w300':u;};
   const fsig=(url,lbl)=>{const src=firmaThumb(url);return src?'<div style="margin-top:6px;"><div style="font-size:9px;color:#888;margin-bottom:4px;">'+lbl+'</div><img src="'+src+'" style="max-height:70px;max-width:220px;object-fit:contain;border-bottom:2px solid #333;display:block;" onerror="this.style.display=\'none\'"></div>':'<div style="margin-top:6px;height:70px;border-bottom:2px solid #333;"></div><div style="font-size:9px;color:#888;margin-top:4px;">'+lbl+'</div>';};
   const logo=logoPrintSrc();
+  const sol=personaSolicitaDe(r);
+  const solAreaCargo=[sol.area,sol.cargo].filter(Boolean).join(' · ')||'—';
   const h=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>CAMBIO DE EPPS ${r.id}</title>
   <style>body{font:12px/1.5 Arial,sans-serif;margin:0;padding:20px;max-width:800px;margin:0 auto;color:#1a1a1a;}
   .hdr{display:flex;align-items:center;gap:14px;border-bottom:3px solid #1a2636;padding-bottom:10px;margin-bottom:14px;}
@@ -2413,20 +2572,25 @@ function generarVale(id){
   <div class="hdr"><img src="${logo}"><div style="flex:1;"><h1>COMPAÑÍA MINERA CASMA SAC</h1><p>RUC: 20606447192</p><div class="stamp">CAMBIO DE EPPS</div></div>
   <div style="text-align:right;"><div style="font-size:16px;font-weight:700;font-family:monospace;color:#1a2636;">#${r.id}</div><div style="font-size:9px;color:#888;">${new Date().toLocaleDateString('es-PE')}</div></div></div>
   <table>
-  <tr><td class="lbl">Estado</td><td style="color:${r.estado==='Cerrado'?'#1a9e5c':'#d63b3b'};font-weight:600;">● ${r.estado||'Abierto'}</td><td class="lbl">Riesgo</td><td>${r.nivelRiesgo||'—'}</td></tr>
-  <tr><td class="lbl">Tipo</td><td>${r.tipo||'—'}</td><td class="lbl">Fecha/Hora</td><td>${fd(r.fecha)} ${r.hora||''}</td></tr>
-  <tr><td class="lbl">Categoría</td><td>${r.categoria||'—'}</td><td class="lbl">EPPS cambiados</td><td>${cantidadEppsDe(r)}</td></tr>
-  
-  <tr><td class="lbl">Descripción</td><td colspan="3" style="white-space:pre-wrap;">${escapeHtml(r.descripcion||'—')}</td></tr>
-  <tr><td class="lbl">Ubicación</td><td colspan="3">${r.ubicacion||'—'}</td></tr>
-  <tr><td class="lbl">Responsable</td><td>${r.responsable||'—'}</td><td class="lbl">Persona Reportada</td><td>${r.persona||'—'}</td></tr>
-  <tr><td class="lbl">Jefe inmediato</td><td colspan="3">${escapeHtml(r.jefeInmediato||'—')}</td></tr>
-  <tr><td class="lbl">Reportante</td><td colspan="3">${r.reportador||REPORTANTE_DEFAULT}</td></tr>
+  <tr><td class="lbl">Estado</td><td style="color:${r.estado==='Cerrado'?'#1a9e5c':'#d63b3b'};font-weight:600;">● ${r.estado||'Abierto'}</td><td class="lbl">Fecha/Hora</td><td>${fd(r.fecha)} ${r.hora||''}</td></tr>
+  <tr><td class="lbl">Motivo</td><td>${escapeHtml(r.tipo||'—')}</td><td class="lbl">Categoría</td><td>${escapeHtml(r.categoria||'—')}</td></tr>
+  <tr><td class="lbl">Ubicación</td><td colspan="3">${escapeHtml(r.ubicacion||'—')}</td></tr>
+  <tr><td class="lbl">EPPS entregados</td><td colspan="3">${itemsEppsDe(r).length
+    ? itemsEppsDe(r).map(it=>escapeHtml(tipoEppNombre(it)+(it.talla?' · talla '+it.talla:'')+' ×'+(parseInt(it.cantidad,10)||1))).join('<br>')
+    : escapeHtml(String(cantidadEppsDe(r))+' unidad(es)')}</td></tr>
+  <tr><td class="lbl">Observaciones</td><td colspan="3" style="white-space:pre-wrap;">${escapeHtml(r.descripcion||'—')}</td></tr>
+  <tr><td class="lbl">Persona que solicita el cambio</td><td colspan="3" style="font-weight:700;font-size:13px;">${escapeHtml(sol.nombre||'—')}</td></tr>
+  <tr><td class="lbl">DNI del solicitante</td><td style="font-family:monospace;">${escapeHtml(sol.dni||'—')}</td><td class="lbl">Área / Cargo</td><td>${escapeHtml(solAreaCargo)}</td></tr>
+  <tr><td class="lbl">Responsable (Almacén)</td><td>${escapeHtml(r.responsable||'—')}</td><td class="lbl">Jefe inmediato</td><td>${escapeHtml(r.jefeInmediato||'—')}</td></tr>
+  <tr><td class="lbl">Registrado por</td><td colspan="3">${escapeHtml(r.reportador||REPORTANTE_DEFAULT)}</td></tr>
   </table>
   ${r.estado==='Cerrado'?`<table><tr><td class="lbl">Fecha Cierre</td><td>${fd(r.fechaCierre)}</td><td class="lbl">Medidas</td><td style="white-space:pre-wrap;">${escapeHtml(r.medidasAcciones||'—')}</td></tr></table>`:''}
-  ${imgs(fH,'Fotos del Hallazgo')}${fE.length?imgs(fE,'Fotos del Personal'):''}${fL.length?imgs(fL,'Fotos de Cierre'):''}
-  <div class="firmas"><div class="fb">${fsig(r.firmaRegistro,'Firma Registrador')}<div style="font-size:9px;color:#555;margin-top:2px;">${r.reportador||REPORTANTE_DEFAULT}</div></div>
-  ${r.firmaEdicion&&r.firmaEdicion!=='null'?`<div class="fb">${fsig(r.firmaEdicion,'Firma Editor')}</div>`:''}</div>
+  ${imgs(fH,'Fotos de EPPS retirados')}${fE.length?imgs(fE,'Fotos de quien recibe el EPP'):''}${fL.length?imgs(fL,'Fotos de Cierre'):''}
+  <div class="firmas">
+    <div class="fb">${fsig(r.firmaRegistro,'Firma Registrador')}<div style="font-size:9px;color:#555;margin-top:2px;">${escapeHtml(r.reportador||REPORTANTE_DEFAULT)}</div></div>
+    <div class="fb">${fsig('','Firma de quien solicita el cambio')}<div style="font-size:9px;color:#555;margin-top:2px;">${escapeHtml(sol.nombre||'—')}${sol.dni?' · DNI '+escapeHtml(sol.dni):''}</div></div>
+    ${r.firmaEdicion&&r.firmaEdicion!=='null'?`<div class="fb">${fsig(r.firmaEdicion,'Firma Editor')}</div>`:''}
+  </div>
   <div style="text-align:center;margin-top:20px;font-size:8px;color:#aaa;border-top:1px solid #eee;padding-top:6px;">CAMBIO DE EPPS — Compañía Minera Casma SAC — RUC 20606447192</div>
   <script>window.onload=()=>{const imgs=document.querySelectorAll("img");if(!imgs.length){setTimeout(()=>window.print(),500);return;}let loaded=0;const total=imgs.length;const tryPrint=()=>{loaded++;if(loaded>=total)setTimeout(()=>window.print(),300);};imgs.forEach(img=>{if(img.complete){tryPrint();}else{img.onload=tryPrint;img.onerror=tryPrint;}});setTimeout(()=>window.print(),6000);};<\/script></body></html>`;
   const w=window.open('','_blank');w.document.write(h);w.document.close();
@@ -2442,17 +2606,16 @@ function exportarPDF(){
   data.forEach(r=>{
     const fH=toArray(r.fotos).length?toArray(r.fotos):toArray(r.linksFotos);
     const fE=toArray(r.fotosEntrega).length?toArray(r.fotosEntrega):toArray(r.linksFotosEntrega);
-    const fL=toArray(r.fotosLevantamiento).length?toArray(r.fotosLevantamiento):toArray(r.linksFotosLevantamiento);
     const ic=u=>u.slice(0,2).map(x=>'<img src="'+driveThumb(x)+'" style="width:65px;height:48px;object-fit:cover;border-radius:3px;margin:1px;" onerror="this.style.display=\'none\'">').join('');
     const e=r.estado||'Abierto';
     const firmaImg=firmThumb(r.firmaRegistro);
     const rep=escapeHtml(r.reportador||REPORTANTE_DEFAULT);
-    rows+=`<tr><td style="font-family:monospace;text-align:center;">${r.id}</td><td>${fd(r.fecha)}</td><td>${r.hora||''}</td><td>${r.tipo||''}</td><td>${r.ubicacion||''}</td><td>${r.nivelRiesgo||''}</td><td style="max-width:170px;white-space:pre-wrap;">${escapeHtml((r.descripcion||'').slice(0,200))}</td><td>${ic(fH)}</td><td>${ic(fE)}</td><td style="max-width:140px;white-space:pre-wrap;">${escapeHtml((r.medidasAcciones||'').slice(0,150))}</td><td>${ic(fL)}</td><td style="color:${e==='Cerrado'?'#1a9e5c':'#d63b3b'};font-weight:600;">● ${e}</td><td>${rep}</td><td style="text-align:center;min-width:90px;">${firmaImg?'<img src="'+firmaImg+'" style="height:45px;max-width:90px;object-fit:contain;" onerror="this.style.display=\'none\'"><div style="font-size:7px;color:#555;margin-top:2px;border-top:1px solid #ccc;">'+rep+'</div>':'<span style="font-size:7px;color:#ccc;">Sin firma</span>'}</td></tr>`;
+    rows+=`<tr><td style="font-family:monospace;text-align:center;">${r.id}</td><td>${fd(r.fecha)}</td><td>${r.hora||''}</td><td>${escapeHtml(r.ubicacion||'')}</td><td style="min-width:110px;">${htmlPersonaSolicitaCorta(r)}</td><td style="max-width:160px;">${escapeHtml(textoItemsEpps(r)||(cantidadEppsDe(r)+' EPP'))}</td><td style="max-width:150px;white-space:pre-wrap;">${escapeHtml((r.descripcion||'').slice(0,200))}</td><td>${ic(fH)}</td><td>${ic(fE)}</td><td style="color:${e==='Cerrado'?'#1a9e5c':'#d63b3b'};font-weight:600;">● ${e}</td><td>${rep}</td><td style="text-align:center;min-width:90px;">${firmaImg?'<img src="'+firmaImg+'" style="height:45px;max-width:90px;object-fit:contain;" onerror="this.style.display=\'none\'"><div style="font-size:7px;color:#555;margin-top:2px;border-top:1px solid #ccc;">'+rep+'</div>':'<span style="font-size:7px;color:#ccc;">Sin firma</span>'}</td></tr>`;
   });
   const logo=logoPrintSrc();
   const h=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>CAMBIO DE EPPS</title><style>body{font:9px/1.4 Arial,sans-serif;margin:14px;}.hdr{display:flex;align-items:center;gap:10px;border-bottom:2px solid #1a2636;padding-bottom:8px;margin-bottom:10px;}.hdr img{width:55px;height:55px;object-fit:contain;}h1{font-size:12px;color:#1a2636;margin:0;}h2{font-size:9px;color:#555;margin:0;font-weight:normal;}.stamp{display:inline-block;background:#1a2636;color:#fff;font-size:10px;font-weight:700;letter-spacing:0.14em;padding:3px 8px;margin:4px 0;}table{width:100%;border-collapse:collapse;}th{background:#1a2636;color:#fff;padding:4px 3px;text-align:left;font-size:8px;text-transform:uppercase;white-space:nowrap;}td{padding:3px;border:1px solid #ddd;vertical-align:top;font-size:8px;}tr:nth-child(even){background:#f8f9fb;}@media print{body{margin:6px;}@page{size:A3 landscape;margin:8mm;}}</style></head><body>
   <div class="hdr"><img src="${logo}"><div><h1>COMPAÑÍA MINERA CASMA SAC</h1><div class="stamp">CAMBIO DE EPPS</div><h2>RUC: 20606447192 — Total: ${data.length} cambios | Generado: ${new Date().toLocaleDateString('es-PE')}</h2></div></div>
-  <table><thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Lugar</th><th>Riesgo</th><th>Descripción del Hallazgo</th><th>Foto hallazgo</th><th>Foto personal</th><th>Medidas Correctivas</th><th>Foto lev.</th><th>Estado</th><th>Reportante</th><th style="min-width:90px;">Firma Registrador</th></tr></thead><tbody>${rows}</tbody></table>
+  <table><thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Lugar</th><th>Solicitante</th><th>EPPS entregados</th><th>Observaciones</th><th>EPPS retirados</th><th>Quien recibe</th><th>Estado</th><th>Registrado por</th><th style="min-width:90px;">Firma Registrador</th></tr></thead><tbody>${rows}</tbody></table>
   <div style="text-align:center;margin-top:10px;font-size:7px;color:#aaa;">CAMBIO DE EPPS — Compañía Minera Casma SAC — RUC 20606447192</div>
   <script>window.onload=()=>{const imgs=document.querySelectorAll("img");if(!imgs.length){setTimeout(()=>window.print(),500);return;}let loaded=0;const total=imgs.length;const tryPrint=()=>{loaded++;if(loaded>=total)setTimeout(()=>window.print(),300);};imgs.forEach(img=>{if(img.complete){tryPrint();}else{img.onload=tryPrint;img.onerror=tryPrint;}});setTimeout(()=>window.print(),6000);};<\/script></body></html>`;
   const w=window.open('','_blank');w.document.write(h);w.document.close();
@@ -2465,15 +2628,15 @@ async function exportarExcel(){
   if(!window.XLSX){await new Promise((r,j)=>{const s=document.createElement('script');s.src=EXCEL.cdn;s.onload=r;s.onerror=j;document.head.appendChild(s);});}
   const fd=f=>{if(!f)return'';try{return new Date(f).toLocaleDateString('es-PE');}catch{return f;}};
   const did=u=>{const m=u.match(/[?&]id=([\w-]+)/)||u.match(/\/d\/([\w-]+)/);return m?'https://lh3.googleusercontent.com/d/'+m[1]:u;};
-  const ws_data=[['ID','Fecha','Hora','Tipo','Ubicación','Riesgo','Categoría','EPPS cambiados','Descripción','Fotos Hallazgo','Fotos del Personal','Estado','Fotos Levantamiento','Medidas/Acciones','Reportador','Jefe inmediato','Persona Obs.','DNI Obs.','Fecha Cierre']];
+  const ws_data=[['ID','Fecha','Hora','Motivo','Ubicación','Categoría','EPPS entregados','Cantidad','Observaciones','Fotos EPPS retirados','Fotos quien recibe','Estado','Acciones','Registrado por','Jefe inmediato','Persona que solicita el cambio','DNI solicitante','Área solicitante','Cargo solicitante','Fecha Cierre']];
   data.forEach(r=>{
     const fH=toArray(r.fotos).length?toArray(r.fotos):toArray(r.linksFotos);
     const fE=toArray(r.fotosEntrega).length?toArray(r.fotosEntrega):toArray(r.linksFotosEntrega);
-    const fL=toArray(r.fotosLevantamiento).length?toArray(r.fotosLevantamiento):toArray(r.linksFotosLevantamiento);
-    ws_data.push([r.id||'',fd(r.fecha),r.hora||'',r.tipo||'',r.ubicacion||'',r.nivelRiesgo||'',r.categoria||'',cantidadEppsDe(r),r.descripcion||'',fH.map(did).join(' | '),fE.map(did).join(' | '),r.estado||'Abierto',fL.map(did).join(' | '),r.medidasAcciones||'',r.reportador||REPORTANTE_DEFAULT,r.jefeInmediato||'',r.persona||'',r.dniObservado||'',fd(r.fechaCierre)]);
+    const sol=personaSolicitaDe(r);
+    ws_data.push([r.id||'',fd(r.fecha),r.hora||'',r.tipo||'',r.ubicacion||'',r.categoria||'',textoItemsEpps(r),cantidadEppsDe(r),r.descripcion||'',fH.map(did).join(' | '),fE.map(did).join(' | '),r.estado||'Abierto',r.medidasAcciones||'',r.reportador||REPORTANTE_DEFAULT,r.jefeInmediato||'',sol.nombre,sol.dni,sol.area,sol.cargo,fd(r.fechaCierre)]);
   });
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(ws_data);
-  ws['!cols']=[{wch:10},{wch:11},{wch:7},{wch:16},{wch:18},{wch:10},{wch:24},{wch:30},{wch:40},{wch:40},{wch:10},{wch:40},{wch:40},{wch:12},{wch:22},{wch:22},{wch:12},{wch:11}];
+  ws['!cols']=[{wch:10},{wch:11},{wch:7},{wch:16},{wch:18},{wch:24},{wch:28},{wch:10},{wch:36},{wch:32},{wch:32},{wch:10},{wch:24},{wch:12},{wch:22},{wch:28},{wch:14},{wch:18},{wch:18},{wch:12}];
   XLSX.utils.book_append_sheet(wb,ws,EXCEL.sheetName);
   XLSX.writeFile(wb,EXCEL.filePrefix+new Date().toISOString().slice(0,10)+'.xlsx');
   showToast('✓ Excel descargado');
@@ -2508,8 +2671,8 @@ function imprimirStatsMes(){
     ? areasRank.map(([a,n],i)=>`<tr${i===0?' style="background:#e8f1fc;font-weight:700;"':''}><td>${i+1}</td><td>${escapeHtml(a)}</td><td style="text-align:right;font-family:monospace;">${n}</td></tr>`).join('')
     : '<tr><td colspan="3">Sin áreas</td></tr>';
   const filasPers=personasRank.length
-    ? personasRank.map((p,i)=>`<tr${i===0?' style="background:#e8f1fc;font-weight:700;"':''}><td>${i+1}</td><td>${escapeHtml(p.nombre)}</td><td>${escapeHtml(p.area||'—')}</td><td style="text-align:right;font-family:monospace;">${p.count}</td></tr>`).join('')
-    : '<tr><td colspan="4">Sin personas</td></tr>';
+    ? personasRank.map((p,i)=>`<tr${i===0?' style="background:#e8f1fc;font-weight:700;"':''}><td>${i+1}</td><td>${escapeHtml(p.nombre)}</td><td>${escapeHtml(p.area||'—')}</td><td style="text-align:right;font-family:monospace;">${p.epps||p.count}</td></tr>`).join('')
+    : '<tr><td colspan="4">Sin solicitantes</td></tr>';
   const topArea=areasRank[0];
   const topPersona=personasRank[0];
   const topClasif=sortedC[0];
@@ -2522,6 +2685,19 @@ function imprimirStatsMes(){
     <td style="text-align:right;font-family:monospace;">${n}</td>
     <td><div style="height:10px;background:#e8edf2;border-radius:4px;overflow:hidden;"><div style="height:100%;width:${Math.round(n/maxMes*100)}%;background:#1a6fd4;"></div></div></td>
   </tr>`).join('');
+  const eppTipoPrint={};
+  data.forEach(r=>{
+    itemsEppsDe(r).forEach(it=>{
+      const nom=tipoEppNombre(it);
+      if(!nom) return;
+      const n=parseInt(it.cantidad,10);
+      eppTipoPrint[nom]=(eppTipoPrint[nom]||0)+(Number.isFinite(n)&&n>0?n:1);
+    });
+  });
+  const filasEppTipo=Object.entries(eppTipoPrint).sort((a,b)=>b[1]-a[1]);
+  const filasTipoEppHtml=filasEppTipo.length
+    ? filasEppTipo.map(([t,n],i)=>`<tr${i===0?' style="background:#e8f1fc;font-weight:700;"':''}><td>${i+1}</td><td>${escapeHtml(t)}</td><td style="text-align:right;font-family:monospace;">${n}</td></tr>`).join('')
+    : '<tr><td colspan="3">Sin EPPS tipificados</td></tr>';
   const filasCat=sortedC.length
     ? sortedC.map(([c,n])=>`<tr><td>${escapeHtml(c)}</td><td style="text-align:right;font-family:monospace;">${n}</td></tr>`).join('')
     : '<tr><td colspan="2">Sin categorías</td></tr>';
@@ -2567,7 +2743,7 @@ function imprimirStatsMes(){
   </div>
   <div class="grid">
     <div class="card"><span>Área con más cambios</span><strong style="font-size:14px;">${topArea?escapeHtml(topArea[0]):'—'}</strong><div style="font-size:12px;color:#555;margin-top:4px;">${topArea?topArea[1]+' cambios':''}</div></div>
-    <div class="card"><span>Más incidencias</span><strong style="font-size:14px;">${topPersona?escapeHtml(topPersona.nombre):'—'}</strong><div style="font-size:12px;color:#555;margin-top:4px;">${topPersona?topPersona.count+' incidencias':''}</div></div>
+    <div class="card"><span>Más cambios de EPPS</span><strong style="font-size:14px;">${topPersona?escapeHtml(topPersona.nombre):'—'}</strong><div style="font-size:12px;color:#555;margin-top:4px;">${topPersona?(topPersona.epps||topPersona.count)+' EPP · '+topPersona.count+' vales':''}</div></div>
     <div class="card"><span>Clasificación más recurrente</span><strong style="font-size:14px;">${topClasif?escapeHtml(topClasif[0]):'—'}</strong><div style="font-size:12px;color:#555;margin-top:4px;">${topClasif?topClasif[1]+' cambios':''}</div></div>
   </div>
   <h2>EPPS cambiados por día · ${escapeHtml(periodo)}</h2>
@@ -2580,14 +2756,19 @@ function imprimirStatsMes(){
     <thead><tr><th>Mes</th><th style="text-align:right;">Cambios</th><th>Distribución</th></tr></thead>
     <tbody>${filasMes}</tbody>
   </table>
+  <h2>EPPS entregados por tipo</h2>
+  <table>
+    <thead><tr><th>#</th><th>Tipo de EPP</th><th style="text-align:right;">Unidades</th></tr></thead>
+    <tbody>${filasTipoEppHtml}</tbody>
+  </table>
   <h2>Área con más cambios de EPPS</h2>
   <table>
     <thead><tr><th>#</th><th>Área / ubicación</th><th style="text-align:right;">Cambios</th></tr></thead>
     <tbody>${filasArea}</tbody>
   </table>
-  <h2>Personas con más incidencias</h2>
+  <h2>Personas con más cambios de EPPS</h2>
   <table>
-    <thead><tr><th>#</th><th>Persona</th><th>Área laboral</th><th style="text-align:right;">Incidencias</th></tr></thead>
+    <thead><tr><th>#</th><th>Solicitante</th><th>Área laboral</th><th style="text-align:right;">EPPS</th></tr></thead>
     <tbody>${filasPers}</tbody>
   </table>
   <h2>Clasificación más recurrente · ${escapeHtml(periodo)}</h2>
