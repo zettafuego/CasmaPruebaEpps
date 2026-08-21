@@ -1571,9 +1571,91 @@ select option {
 }
 
 .banner-sync {
-  background: var(--success-dim);
-  color: var(--success);
-  border-bottom: 1px solid rgba(79, 217, 142, 0.2);
+  background: var(--warning-dim);
+  color: var(--warning);
+  border-bottom: 1px solid rgba(212, 130, 10, 0.35);
+  font-weight: 600;
+}
+
+.banner-pending {
+  background: var(--warning-dim);
+  color: var(--warning);
+  border-bottom: 1px solid rgba(212, 130, 10, 0.35);
+  font-weight: 500;
+}
+
+.hint-sync-stay {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--warning);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.sync-stay-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 18, 28, 0.72);
+  padding: 24px 16px;
+}
+
+.sync-stay-overlay[hidden] {
+  display: none;
+}
+
+.sync-stay-card {
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 28px 22px 24px;
+  text-align: center;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.sync-stay-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.sync-stay-card h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--warning);
+  letter-spacing: 0.01em;
+  margin-bottom: 8px;
+}
+
+.sync-stay-card p {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.45;
+}
+
+.sync-stay-bar {
+  margin-top: 18px;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.sync-stay-bar span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: var(--warning);
+  border-radius: 99px;
+  animation: sync-stay-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes sync-stay-slide {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(350%); }
 }
 
 .divider {

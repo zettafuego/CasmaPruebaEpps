@@ -27,8 +27,8 @@
     </div>
     <div class="splash-text">
       <p class="splash-brand">MINERA CASMA</p>
-      <p class="splash-product">RACS · EPPS</p>
-      <p class="splash-tagline">Cada reporte es inmediato</p>
+      <p class="splash-product">CAMBIO DE EPPS</p>
+      <p class="splash-tagline">Contribuye a mejorar la seguridad en el trabajo</p>
     </div>
     <div class="splash-bar" aria-hidden="true"><span></span></div>
   </div>
@@ -37,16 +37,17 @@
 
 <div id="app-shell" class="app-shell" hidden>
 
-<div class="banner banner-offline" id="offlineBanner"><span>⚠</span> Sin conexión — los reportes se guardarán localmente</div>
-<div class="banner banner-sync"    id="syncBanner"><span>↑</span> Sincronizando reportes pendientes...</div>
+<div class="banner banner-offline" id="offlineBanner"><span>⚠</span> Sin conexión — los reportes se guardarán localmente. No se retire hasta que sincronice.</div>
+<div class="banner banner-sync"    id="syncBanner"><span>⚠</span> No se retire — sincronizando evidencias. No cierre ni salga de la app.</div>
+<div class="banner banner-pending" id="pendingStayBanner"><span>⚠</span> Hay reportes sin sincronizar. No se retire hasta que el envío se complete.</div>
 
 <header class="app-header">
   <div class="header-brand">
     <img class="app-logo" src="cita_minera_casma_sac-removebg-preview.png"
          alt="Compañía Minera Casma SAC" width="40" height="40">
     <div class="app-title-block">
-      <div class="app-title">Minera Casma <span>RACS</span></div>
-      <div class="app-subtitle">Cambios de EPPS · Reportes</div>
+      <div class="app-title">Cambios de <span>EPPS</span></div>
+      <div class="app-subtitle">CIA CASMA· Reportes</div>
     </div>
   </div>
   <button class="sync-badge" onclick="manualSync()" title="Sincronizar">
@@ -86,7 +87,7 @@
       <div class="chip" data-value="Abierto" onclick="selectEstado(this)">● Abierto</div>
       <div class="chip sel-cerrado" data-value="Cerrado" onclick="selectEstado(this)">● Cerrado</div>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:6px;">Por defecto el reporte nace <strong>Cerrado</strong>. Complete fotos de cierre y las acciones realizadas.</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px;">Por defecto el reporte nace <strong>Cerrado</strong>. Complete las acciones realizadas.</div>
   </div>
 
   <div class="form-section">
@@ -94,18 +95,9 @@
     <div class="chip-group" id="tipo-chips">
       <div class="chip" data-value="Acto Subestándar"      onclick="selectTipo(this)">Acto Subestándar</div>
       <div class="chip" data-value="Condición Subestándar" onclick="selectTipo(this)">Condición Subestándar</div>
-      <div class="chip" data-value="Casi Accidente"        onclick="selectTipo(this)">Casi Accidente</div>
     </div>
   </div>
 
-  <div class="form-section">
-    <label class="form-label">Nivel de Riesgo <span class="form-required">*</span></label>
-    <div class="chip-group" id="riesgo-chips">
-      <div class="chip" data-value="Bajo"    onclick="selectRiesgo(this)">● Bajo</div>
-      <div class="chip" data-value="Medio"   onclick="selectRiesgo(this)">● Medio</div>
-      <div class="chip" data-value="Alto"    onclick="selectRiesgo(this)">● Alto</div>
-    </div>
-  </div>
 
   <div class="form-section">
     <label class="form-label">Categoría <span class="form-required">*</span></label>
@@ -142,9 +134,9 @@
 
 
   <div class="form-section">
-    <label class="form-label">Responsable <span class="form-required">*</span></label>
+    <label class="form-label">Responsable de Atención (ALMACEN)  <span class="form-required">*</span></label>
     <div style="position:relative;">
-      <input type="text" id="responsable" placeholder="Buscar por nombre..."
+      <input type="text" id="responsable" placeholder="Buscar por DNI o nombre..."
              autocomplete="off" oninput="buscarResponsable()" onfocus="buscarResponsable()">
       <div id="responsableDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
     </div>
@@ -154,29 +146,20 @@
   <div class="divider"></div>
 
   <div class="form-section">
-    <label class="form-label">Lugar y persona reportada</label>
+    <label class="form-label">Lugar </label>
     <div style="margin-bottom:12px;">
       <label class="form-sublabel">Área / Ubicación <span class="form-required">*</span></label>
       <select id="ubicacion" onchange="toggleUbicacionOtros()">
       <option value="">— Seleccionar —</option>
       <option>Campamento</option>
-      <option>Administración</option>
-      <option>Comedor</option>
-      <option>Almacén principal</option>
-      <option>Almacén 2</option>
-      <option>ATRI</option>
       <option>Garita</option>
-      <option value="Interior Mina">Interior Mina</option>
       <option>Zona 1</option>
-      <option>Comedor zona 1</option>
-      <option>Polvorín</option>
-      <option>Cancha Mineral</option>
-      <option>Cancha desmonte</option>
-      <option>Zona Logueo</option>
-      <option>Cancha madera</option>
-      <option>Taller mantenimiento</option>
-      <option>Cuartos administración</option>
-      <option>Oficinas Lavandería</option>
+      <option>Zona 2</option>
+      <option>Zona 3</option>
+      <option>Zona 4</option>
+      <option>Zona 5</option>
+      <option>Zona 6</option>
+      <option>Zona Lomas</option>
       <option value="Otros">Otros</option>
       </select>
     </div>
@@ -190,17 +173,18 @@
     </div>
 
     <div style="margin-bottom:12px;position:relative;">
-      <label class="form-sublabel">Persona reportada</label>
-      <input type="text" id="persona" placeholder="Buscar por nombre o escribir uno nuevo..." autocomplete="off"
-             oninput="buscarObservadoPorNombre()" onfocus="buscarObservadoPorNombre()">
-      <div id="observadoDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
+      <label class="form-sublabel">DNI del reportado</label>
+      <input type="text" id="dniObservado" placeholder="Buscar por DNI (8 dígitos)..."
+             maxlength="8" inputmode="numeric" autocomplete="off"
+             oninput="onDniObservadoInput()" onfocus="onDniObservadoInput()">
+      <div id="dniObservadoDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
       <div class="dni-status" id="observadoStatus"></div>
     </div>
-    <div style="margin-bottom:12px;">
-      <label class="form-sublabel">DNI del reportado</label>
-      <input type="text" id="dniObservado" placeholder="8 dígitos (si es persona nueva)"
-             maxlength="8" inputmode="numeric" autocomplete="off"
-             oninput="onDniObservadoInput()">
+    <div style="margin-bottom:12px;position:relative;">
+      <label class="form-sublabel">Persona reportada</label>
+      <input type="text" id="persona" placeholder="Se completa con el DNI; o escriba un nombre nuevo..." autocomplete="off"
+             oninput="buscarObservadoPorNombre()" onfocus="buscarObservadoPorNombre()">
+      <div id="observadoDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
     </div>
     <div class="form-row">
       <div>
@@ -216,14 +200,14 @@
     </div>
     <div style="margin-top:12px;position:relative;">
       <label class="form-sublabel">Jefe inmediato <span class="form-required">*</span></label>
-      <input type="text" id="jefeInmediato" placeholder="Buscar por nombre..."
+      <input type="text" id="jefeInmediato" placeholder="Buscar por DNI o nombre..."
              autocomplete="off" oninput="buscarJefeInmediato()" onfocus="buscarJefeInmediato()">
       <div id="jefeInmediatoDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
       <div class="dni-status" id="jefeInmediatoStatus"></div>
     </div>
     <div style="font-size:11px;color:var(--text3);margin-top:6px;">
-      Si la persona ya está en la lista, elija una sugerencia y se completan los datos.
-      Si no existe, complete nombre, DNI, área y cargo: se guardará al registrar el reporte.
+      Busque preferentemente por DNI: al coincidir se autocompletan nombre, área y cargo.
+      Si no existe, complete DNI, nombre, área y cargo: se guardará al registrar el reporte.
     </div>
   </div>
 
@@ -243,7 +227,7 @@
   <div class="divider"></div>
 
   <div class="form-section">
-    <label class="form-label">Foto del hallazgo</label>
+    <label class="form-label">Foto de epps viejos</label>
     <input type="file" id="inputGaleria" accept="image/*" multiple style="display:none" onchange="handlePhotos(this, 'hallazgo')">
     <input type="file" id="inputCamara" accept="image/*" capture="environment" style="display:none" onchange="handlePhotos(this, 'hallazgo')">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -261,9 +245,9 @@
   </div>
 
   <div class="form-section">
-    <label class="form-label">Foto de entrega</label>
+    <label class="form-label">Foto de epps nuevos y el personal <span class="form-required">*</span></label>
     <input type="file" id="inputGaleriaEntrega" accept="image/*" multiple style="display:none" onchange="handlePhotos(this, 'entrega')">
-    <input type="file" id="inputCamaraEntrega" accept="image/*" capture="environment" style="display:none" onchange="handlePhotos(this, 'entrega')">
+    <input type="file" id="inputCamaraEntrega" accept="image/*" capture="user" style="display:none" onchange="handlePhotos(this, 'entrega')">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <button type="button" onclick="document.getElementById('inputCamaraEntrega').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
         <span style="font-size:26px;">📷</span>
@@ -274,31 +258,13 @@
         <span>Galería</span>
       </button>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center;">Máximo 5 fotos de entrega del EPP</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center;">Obligatorio: foto de la persona que recibe el EPP. Máximo 5 fotos.</div>
     <div class="photos-grid" id="photosEntregaPreview"></div>
   </div>
 
   <!-- Sección levantamiento (solo si Cerrado) -->
   <div id="seccionLevantamiento" style="display:block;">
     <div class="divider"></div>
-    <div class="form-section">
-      <label class="form-label">Fotos de cierre</label>
-      <input type="file" id="inputGaleriaLev" accept="image/*" multiple style="display:none" onchange="handlePhotos(this, 'levantamiento')">
-      <input type="file" id="inputCamaraLev" accept="image/*" capture="environment" style="display:none" onchange="handlePhotos(this, 'levantamiento')">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <button type="button" onclick="document.getElementById('inputCamaraLev').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
-          <span style="font-size:26px;">📷</span>
-          <span>Tomar foto</span>
-        </button>
-        <button type="button" onclick="document.getElementById('inputGaleriaLev').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
-          <span style="font-size:26px;">🖼️</span>
-          <span>Galería</span>
-        </button>
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center;">Máximo 5 fotos de cierre</div>
-      <div class="photos-grid" id="photosLevPreview"></div>
-    </div>
-
     <div class="form-section">
       <label class="form-label">Acciones realizadas al cierre <span class="form-required">*</span></label>
       <textarea id="medidasAcciones" placeholder="Describe las acciones realizadas para cerrar el desvío..."></textarea>
@@ -314,6 +280,7 @@
   </div>
 
   <button class="btn-submit" onclick="guardarReporte()">Guardar Reporte</button>
+  <p class="hint-sync-stay">⚠ No se retire hasta que el reporte sincronice. Espere el aviso de envío completo.</p>
   <div style="height:40px;"></div>
 </div>
 
@@ -433,6 +400,15 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div id="syncStayOverlay" class="sync-stay-overlay" hidden>
+  <div class="sync-stay-card" role="alertdialog" aria-modal="true" aria-labelledby="syncStayTitle" aria-describedby="syncStayMsg">
+    <div class="sync-stay-icon" aria-hidden="true">⏳</div>
+    <h2 id="syncStayTitle">No se retire</h2>
+    <p id="syncStayMsg">Espere hasta que el reporte se sincronice. No cierre ni salga de la aplicación.</p>
+    <div class="sync-stay-bar" aria-hidden="true"><span></span></div>
+  </div>
+</div>
 
 </div><!-- /#app-shell -->
 

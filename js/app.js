@@ -178,20 +178,82 @@ function normalizarPersona(p){
   };
 }
 
+function soloDigitos(s){
+  return String(s||'').replace(/\D/g,'');
+}
+
+function dniDe(p){
+  return soloDigitos(p?.dni);
+}
+
 function buscarPersonalPorDni(dni){
-  const d=String(dni||'').trim();
+  const d=soloDigitos(dni);
   if(!d) return null;
-  return getPersonal().find(p=>String(p.dni).trim()===d) || null;
+  return getPersonal().find(p=>dniDe(p)===d) || null;
+}
+
+/** Coincidencias por prefijo de DNI, exacto primero. */
+function buscarPersonalPorDniPrefijo(q, limit=8){
+  const d=soloDigitos(q);
+  if(!d) return [];
+  return getPersonal()
+    .filter(p=>dniDe(p).startsWith(d))
+    .sort((a,b)=>{
+      const da=dniDe(a), db=dniDe(b);
+      if(da===d && db!==d) return -1;
+      if(db===d && da!==d) return 1;
+      return da.localeCompare(db) || (a.nombre||'').localeCompare(b.nombre||'');
+    })
+    .slice(0, limit);
+}
+
+/**
+ * Búsqueda de personal: DNI primero, nombre como respaldo.
+ * Puntaje: DNI exacto > prefijo DNI > DNI contiene > nombre exacto/prefijo/contiene.
+ */
+function buscarPersonal(q, limit=8){
+  const raw=String(q||'').trim();
+  if(!raw) return [];
+  const digits=soloDigitos(raw);
+  const sl=raw.toLowerCase();
+  const scored=getPersonal().map(p=>{
+    const dni=dniDe(p);
+    const nom=(p.nombre||'').toLowerCase();
+    let score=0;
+    if(digits && dni){
+      if(dni===digits) score=100;
+      else if(dni.startsWith(digits)) score=80;
+      else if(digits.length>=4 && dni.includes(digits)) score=55;
+    }
+    if(nom && /[a-záéíóúñ]/i.test(raw)){
+      if(nom===sl) score=Math.max(score,40);
+      else if(nom.startsWith(sl)) score=Math.max(score,30);
+      else if(nom.includes(sl)) score=Math.max(score,20);
+    } else if(nom && !digits){
+      if(nom===sl) score=Math.max(score,40);
+      else if(nom.startsWith(sl)) score=Math.max(score,30);
+      else if(nom.includes(sl)) score=Math.max(score,20);
+    }
+    return {p, score};
+  }).filter(x=>x.score>0)
+    .sort((a,b)=>b.score-a.score || (a.p.nombre||'').localeCompare(b.p.nombre||''));
+  return scored.slice(0, limit).map(x=>x.p);
 }
 
 function buscarPersonalPorNombre(q){
-  const s=String(q||'').toLowerCase().trim();
-  if(!s) return [];
-  return getPersonal().filter(p=>{
-    const nom=(p.nombre||'').toLowerCase();
-    const dni=String(p.dni||'');
-    return nom.includes(s) || dni.startsWith(s);
-  }).slice(0,8);
+  return buscarPersonal(q);
+}
+
+function htmlOpcionPersona(p, i, fn){
+  return `<div onclick="${fn}(${i})"
+         data-idx="${i}"
+         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;"
+         onmouseover="this.style.background='var(--surface2)'"
+         onmouseout="this.style.background=''">
+      <div style="font-weight:600;font-family:var(--mono);letter-spacing:0.03em;">DNI ${escapeHtml(p.dni||'—')}</div>
+      <div style="font-weight:500;">${escapeHtml(p.nombre||'')}</div>
+      <div style="font-size:11px;color:var(--text3);">${escapeHtml(p.area||'')} · ${escapeHtml(p.cargo||'')}</div>
+    </div>`;
 }
 
 /**
@@ -262,48 +324,45 @@ function buscarObservadoPorNombre(){
   const q = (document.getElementById('persona').value||'').trim();
   const dropdown = document.getElementById('observadoDropdown');
   const status = document.getElementById('observadoStatus');
+  const dniDd=document.getElementById('dniObservadoDropdown');
+  if(dniDd) dniDd.style.display='none';
 
   if(!q){
     dropdown.style.display='none';
-    observadoSeleccionado=null;
-    status.className='dni-status';
-    status.textContent='';
     return;
   }
 
-  const resultados = buscarPersonalPorNombre(q);
+  const resultados = buscarPersonal(q);
 
   if(!resultados.length){
     dropdown.style.display='none';
-    observadoSeleccionado=null;
-    status.className='dni-status notfound';
-    status.textContent='Persona nueva — complete DNI, área y cargo; se guardará al registrar';
+    if(!observadoSeleccionado){
+      status.className='dni-status notfound';
+      status.textContent='Persona nueva — complete DNI, área y cargo; se guardará al registrar';
+    }
     return;
   }
 
-  dropdown.innerHTML = resultados.map((p,i) => `
-    <div onclick="seleccionarObservado(${i})"
-         data-idx="${i}"
-         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;"
-         onmouseover="this.style.background='var(--surface2)'"
-         onmouseout="this.style.background=''">
-      <div style="font-weight:500;">${escapeHtml(p.nombre)}</div>
-      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);">${escapeHtml(p.area||'')} · ${escapeHtml(p.cargo||'')} · DNI: ${escapeHtml(p.dni||'')}</div>
-    </div>
-  `).join('') + `
+  const exactDni=soloDigitos(q).length>=6 && resultados.length===1 && dniDe(resultados[0]).startsWith(soloDigitos(q));
+  if(exactDni && dniDe(resultados[0])===soloDigitos(q)){
+    dropdown._results=resultados;
+    seleccionarObservadoObj(resultados[0]);
+    return;
+  }
+
+  dropdown.innerHTML = resultados.map((p,i)=>htmlOpcionPersona(p,i,'seleccionarObservado')).join('') + `
     <div onclick="marcarObservadoNuevo()"
          style="padding:10px 14px;cursor:pointer;font-size:12px;color:var(--accent);font-weight:500;background:var(--surface2);">
       ＋ Usar «${escapeHtml(q)}» como persona nueva
     </div>`;
   dropdown._results = resultados;
   dropdown.style.display='block';
-  // Si hay match exacto de nombre, no forzar aún; usuario elige
   if(observadoSeleccionado && (observadoSeleccionado.nombre||'').toLowerCase()===q.toLowerCase()){
     status.className='dni-status found';
-    status.textContent='✓ '+escapeHtml(observadoSeleccionado.nombre);
+    status.textContent='✓ '+escapeHtml(observadoSeleccionado.nombre)+' · DNI '+escapeHtml(observadoSeleccionado.dni||'');
   } else {
     status.className='dni-status';
-    status.textContent='Seleccione de la lista o cree persona nueva';
+    status.textContent='Seleccione de la lista (búsqueda por DNI) o cree persona nueva';
   }
 }
 
@@ -321,24 +380,54 @@ function marcarObservadoNuevo(){
 function onDniObservadoInput(){
   const el=document.getElementById('dniObservado');
   if(!el) return;
-  el.value=el.value.replace(/\D/g,'').slice(0,8);
+  el.value=soloDigitos(el.value).slice(0,8);
   const dni=el.value.trim();
   const status=document.getElementById('observadoStatus');
-  if(dni.length!==8){
-    if(dni.length>0){
-      status.className='dni-status';
-      status.textContent='DNI: escriba 8 dígitos';
-    }
+  const dropdown=document.getElementById('dniObservadoDropdown');
+  const nomDd=document.getElementById('observadoDropdown');
+  if(nomDd) nomDd.style.display='none';
+
+  if(!dni){
+    if(dropdown) dropdown.style.display='none';
+    if(status){ status.className='dni-status'; status.textContent=''; }
     return;
   }
-  const match=buscarPersonalPorDni(dni);
-  if(match){
-    seleccionarObservadoObj(match);
-  } else {
+
+  const resultados=buscarPersonalPorDniPrefijo(dni);
+  const exacto=resultados.find(p=>dniDe(p)===dni);
+
+  if(exacto){
+    if(dropdown) dropdown.style.display='none';
+    seleccionarObservadoObj(exacto);
+    return;
+  }
+
+  if(!resultados.length){
+    if(dropdown) dropdown.style.display='none';
     observadoSeleccionado=null;
     status.className='dni-status notfound';
-    status.textContent='DNI nuevo — complete nombre, área y cargo; se guardará al registrar';
+    status.textContent=dni.length===8
+      ? 'DNI nuevo — complete nombre, área y cargo; se guardará al registrar'
+      : 'Sin coincidencia por DNI — siga escribiendo o complete los datos';
+    return;
   }
+
+  if(dropdown){
+    dropdown.innerHTML=resultados.map((p,i)=>htmlOpcionPersona(p,i,'seleccionarObservadoDesdeDni')).join('');
+    dropdown._results=resultados;
+    dropdown.style.display='block';
+  }
+  status.className='dni-status';
+  status.textContent=dni.length<8
+    ? 'Escriba el DNI — se autocompleta al coincidir'
+    : 'Seleccione la persona de la lista';
+}
+
+function seleccionarObservadoDesdeDni(idx){
+  const dropdown=document.getElementById('dniObservadoDropdown');
+  const p=dropdown && dropdown._results ? dropdown._results[idx] : null;
+  if(!p) return;
+  seleccionarObservadoObj(p);
 }
 
 function seleccionarObservado(idx){
@@ -352,94 +441,122 @@ function seleccionarObservadoObj(p){
   if(!p) return;
   observadoSeleccionado = p;
   document.getElementById('persona').value = p.nombre||'';
-  document.getElementById('dniObservado').value = p.dni||'';
+  document.getElementById('dniObservado').value = dniDe(p) || (p.dni||'');
   document.getElementById('areaReportado').value = p.area||'';
   document.getElementById('cargoReportado').value = p.cargo||'';
   const dropdown = document.getElementById('observadoDropdown');
   if(dropdown) dropdown.style.display='none';
+  const dniDd=document.getElementById('dniObservadoDropdown');
+  if(dniDd) dniDd.style.display='none';
   const status = document.getElementById('observadoStatus');
   status.className='dni-status found';
-  status.textContent='✓ '+escapeHtml(p.nombre||'')+' (datos completados)';
+  status.textContent='✓ DNI '+escapeHtml(p.dni||'')+' — '+escapeHtml(p.nombre||'')+' (datos completados)';
 }
 
-// ── Responsable acción correctiva: autocomplete por nombre ──
+function autocompletarPorDniSiExacto(q, resultados, aplicar){
+  const d=soloDigitos(q);
+  if(!d || d.length<6 || !resultados.length) return false;
+  const exactos=resultados.filter(p=>dniDe(p)===d);
+  if(exactos.length===1){ aplicar(exactos[0]); return true; }
+  return false;
+}
+
+// ── Responsable acción correctiva: autocomplete por DNI (preferente) o nombre ──
 function buscarResponsable(){
-  const q = (document.getElementById('responsable').value||'').toLowerCase().trim();
+  const q = (document.getElementById('responsable').value||'').trim();
   const dd = document.getElementById('responsableDropdown');
   const status = document.getElementById('responsableStatus');
   if(!dd) return;
   if(!q){ dd.style.display='none'; return; }
 
-  const resultados = buscarPersonalPorNombre(q);
+  const resultados = buscarPersonal(q);
 
   if(!resultados.length){
     dd.style.display='none';
     if(status){
       status.className='dni-status notfound';
-      status.textContent='Nombre libre (no está en la lista; se puede escribir igual)';
+      status.textContent='Sin coincidencia por DNI — puede escribir el nombre igual';
     }
     return;
   }
 
-  dd.innerHTML = resultados.map((p,i) => `
-    <div onclick="seleccionarResponsable(${i})"
-         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;"
-         onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <div style="font-weight:500;">${escapeHtml(p.nombre||'')}</div>
-      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);">${escapeHtml(p.area||'')} · ${escapeHtml(p.cargo||'')}</div>
-    </div>`).join('');
+  if(autocompletarPorDniSiExacto(q, resultados, p=>seleccionarResponsableObj(p))) return;
+
+  dd.innerHTML = resultados.map((p,i)=>htmlOpcionPersona(p,i,'seleccionarResponsable')).join('');
   dd._results = resultados;
   dd.style.display='block';
+  if(status){
+    status.className='dni-status';
+    status.textContent='Seleccione de la lista (preferencia por DNI)';
+  }
 }
 
 function seleccionarResponsable(idx){
   const dd = document.getElementById('responsableDropdown');
   const p = dd._results[idx];
   if(!p) return;
-  document.getElementById('responsable').value = p.nombre||'';
-  dd.style.display='none';
-  const status = document.getElementById('responsableStatus');
-  if(status){ status.className='dni-status found'; status.textContent='✓ '+escapeHtml(p.nombre||''); }
+  seleccionarResponsableObj(p);
 }
 
-// ── Jefe inmediato: autocomplete por nombre ──
+function seleccionarResponsableObj(p){
+  if(!p) return;
+  document.getElementById('responsable').value = p.nombre||'';
+  const dd = document.getElementById('responsableDropdown');
+  if(dd) dd.style.display='none';
+  const status = document.getElementById('responsableStatus');
+  if(status){
+    status.className='dni-status found';
+    status.textContent='✓ DNI '+escapeHtml(p.dni||'')+' — '+escapeHtml(p.nombre||'');
+  }
+}
+
+// ── Jefe inmediato: autocomplete por DNI (preferente) o nombre ──
 function buscarJefeInmediato(){
-  const q = (document.getElementById('jefeInmediato').value||'').toLowerCase().trim();
+  const q = (document.getElementById('jefeInmediato').value||'').trim();
   const dd = document.getElementById('jefeInmediatoDropdown');
   const status = document.getElementById('jefeInmediatoStatus');
   if(!dd) return;
   if(!q){ dd.style.display='none'; return; }
 
-  const resultados = buscarPersonalPorNombre(q);
+  const resultados = buscarPersonal(q);
 
   if(!resultados.length){
     dd.style.display='none';
     if(status){
       status.className='dni-status notfound';
-      status.textContent='Nombre libre (no está en la lista; se puede escribir igual)';
+      status.textContent='Sin coincidencia por DNI — puede escribir el nombre igual';
     }
     return;
   }
 
-  dd.innerHTML = resultados.map((p,i) => `
-    <div onclick="seleccionarJefeInmediato(${i})"
-         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;"
-         onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <div style="font-weight:500;">${escapeHtml(p.nombre||'')}</div>
-      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);">${escapeHtml(p.area||'')} · ${escapeHtml(p.cargo||'')}</div>
-    </div>`).join('');
+  if(autocompletarPorDniSiExacto(q, resultados, p=>seleccionarJefeInmediatoObj(p))) return;
+
+  dd.innerHTML = resultados.map((p,i)=>htmlOpcionPersona(p,i,'seleccionarJefeInmediato')).join('');
   dd._results = resultados;
   dd.style.display='block';
+  if(status){
+    status.className='dni-status';
+    status.textContent='Seleccione de la lista (preferencia por DNI)';
+  }
 }
 
 function seleccionarJefeInmediato(idx){
   const dd = document.getElementById('jefeInmediatoDropdown');
   const p = dd._results[idx];
   if(!p) return;
+  seleccionarJefeInmediatoObj(p);
+}
+
+function seleccionarJefeInmediatoObj(p){
+  if(!p) return;
   document.getElementById('jefeInmediato').value = p.nombre||'';
-  dd.style.display='none';
+  const dd = document.getElementById('jefeInmediatoDropdown');
+  if(dd) dd.style.display='none';
   const status = document.getElementById('jefeInmediatoStatus');
-  if(status){ status.className='dni-status found'; status.textContent='✓ '+escapeHtml(p.nombre||''); }
+  if(status){
+    status.className='dni-status found';
+    status.textContent='✓ DNI '+escapeHtml(p.dni||'')+' — '+escapeHtml(p.nombre||'');
+  }
 }
 
 function limpiarObservado(){
@@ -453,6 +570,7 @@ function limpiarObservado(){
 document.addEventListener('click', e=>{
   [
     {id:'observadoDropdown',  inputId:'persona'},
+    {id:'dniObservadoDropdown',inputId:'dniObservado'},
     {id:'responsableDropdown',inputId:'responsable'},
     {id:'jefeInmediatoDropdown',inputId:'jefeInmediato'},
   ].forEach(({id, inputId})=>{
@@ -589,7 +707,6 @@ function mapaEppsPorDia(anio, mes){
 function guardarReporte(){
   if(!selectedEstado)      {showToast('⚠ Selecciona el estado del reporte');return;}
   if(!selectedTipo)        {showToast('⚠ Selecciona el tipo de reporte');return;}
-  if(!selectedRiesgo)      {showToast('⚠ Selecciona el nivel de riesgo');return;}
   if(!g('categoria'))      {showToast('⚠ Selecciona una categoría');return;}
   if(g('categoria')==='Otro' && !g('categoriaOtro')){showToast('⚠ Describe la categoría en Otro');return;}
   const desc=g('descripcion');
@@ -622,6 +739,10 @@ function guardarReporte(){
   }
 
   if(!getFirmaDataURL('firmaCanvas')){showToast('⚠ Dibuja tu firma para continuar');return;}
+  if(!photoEntregaDataURLs.length){
+    showToast('⚠ Toma la foto del personal que recibe el EPP');
+    return;
+  }
 
   // Si está cerrado, validar campos de levantamiento
   if(selectedEstado==='Cerrado'){
@@ -656,7 +777,7 @@ function guardarReporte(){
     cargoReportador:'',
     fotos:photoDataURLs,
     fotosEntrega:photoEntregaDataURLs,
-    fotosLevantamiento:selectedEstado==='Cerrado'?photoLevDataURLs:[],
+    fotosLevantamiento:[],
     medidasAcciones:selectedEstado==='Cerrado'?g('medidasAcciones'):'',
     fechaCierre:selectedEstado==='Cerrado'?new Date().toISOString():'',
     createdAt:new Date().toISOString(),
@@ -676,12 +797,18 @@ function guardarReporte(){
   resetForm();
   renderStats();
   updateLiveStamp();
+  mostrarAvisoNoRetirarse(
+    navigator.onLine
+      ? 'Espere hasta que el reporte se sincronice. No cierre ni salga de la aplicación.'
+      : 'Reporte guardado localmente. No se retire hasta que haya internet y se complete la sincronización.'
+  );
   showToast(
     navigator.onLine
-      ? '✓ Cambio de EPPS registrado — envío inmediato a Minera Casma RACS'
-      : '✓ Cambio de EPPS guardado localmente (se enviará al volver online)'
+      ? '✓ Registrado — no se retire hasta que sincronice'
+      : '✓ Guardado localmente — no se retire hasta que sincronice'
   );
   if(navigator.onLine) autoSync();
+  else actualizarAvisoPendiente();
   showTab('reportes');
 }
 
@@ -737,7 +864,7 @@ function resetForm(){
   limpiarFirma('firmaCanvas');
   document.getElementById('photosPreview').innerHTML='';
   const pe=document.getElementById('photosEntregaPreview'); if(pe) pe.innerHTML='';
-  document.getElementById('photosLevPreview').innerHTML='';
+  const pl=document.getElementById('photosLevPreview'); if(pl) pl.innerHTML='';
   document.getElementById('fecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('hora').value=new Date().toTimeString().slice(0,5);
 }
@@ -951,7 +1078,7 @@ function openModal(id){
       <span class="detail-value ${r.synced?'status-synced':'status-pending'}">${r.synced?'✓ Sincronizado':'⏳ Pendiente'}</span>
     </div>
     ${fotosHallazgo.length?`<div style="margin-top:14px;"><div class="section-title">Fotos del hallazgo (${fotosHallazgo.length})</div><div class="photos-modal-grid">${fotosHallazgo.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
-    ${fotosEntrega.length?`<div style="margin-top:14px;"><div class="section-title">Fotos de entrega (${fotosEntrega.length})</div><div class="photos-modal-grid">${fotosEntrega.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
+    ${fotosEntrega.length?`<div style="margin-top:14px;"><div class="section-title">Fotos del personal (${fotosEntrega.length})</div><div class="photos-modal-grid">${fotosEntrega.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
     ${fotosLev.length?`<div style="margin-top:14px;"><div class="section-title">Fotos de cierre (${fotosLev.length})</div><div class="photos-modal-grid">${fotosLev.map(f=>{const gid=(typeof f==='string'&&(f.match(/[?&]id=([\w-]+)/)||f.match(/\/d\/([\w-]+)/)))?.[1];const src=gid?'https://lh3.googleusercontent.com/d/'+gid+'=w400':f;return`<div style="position:relative;width:100%;aspect-ratio:1;background:var(--surface2);border-radius:var(--radius-sm);overflow:hidden;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"><a href="${typeof f==='string'?f:''}" target="_blank" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 7px;border-radius:10px;text-decoration:none;">↗ Ver</a></div>`;}).join('')}</div></div>`:''}
     ${firmaImgUrl(r.firmaRegistro)?'<div style="margin-top:14px;"><div class="section-title">Firma Registrador</div><img src="'+firmaImgUrl(r.firmaRegistro)+'" style="max-width:200px;border-bottom:1px solid var(--border2);" onerror="this.style.display=\'none\'"></div>':''}
     ${firmaImgUrl(r.firmaEdicion)?'<div style="margin-top:10px;"><div class="section-title">Firma Editor</div><img src="'+firmaImgUrl(r.firmaEdicion)+'" style="max-width:200px;border-bottom:1px solid var(--border2);" onerror="this.style.display=\'none\'"></div>':''}
@@ -1007,21 +1134,6 @@ function abrirEdicion(id){
 
     <div id="editLevantamientoSection" style="display:${estadoActual==='Cerrado'?'block':'none'};">
       <div class="form-section">
-        <label class="form-label">Fotos de cierre</label>
-        <input type="file" id="editInputGaleriaLev" accept="image/*" multiple style="display:none" onchange="handlePhotos(this, 'editLev')">
-        <input type="file" id="editInputCamaraLev" accept="image/*" capture="environment" style="display:none" onchange="handlePhotos(this, 'editLev')">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <button type="button" onclick="document.getElementById('editInputCamaraLev').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
-            <span style="font-size:26px;">📷</span><span>Tomar foto</span>
-          </button>
-          <button type="button" onclick="document.getElementById('editInputGaleriaLev').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
-            <span style="font-size:26px;">🖼️</span><span>Galería</span>
-          </button>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center;">${r.fotosLevantamiento&&r.fotosLevantamiento.length?'Máximo 5 fotos de cierre. Si subes nuevas, reemplazarán las existentes.':'Máximo 5 fotoss de cierre'}</div>
-        <div class="photos-grid" id="editPhotosLevPreview"></div>
-      </div>
-      <div class="form-section">
         <label class="form-label">Acciones realizadas al cierre <span class="form-required">*</span></label>
         <textarea id="editMedidasAcciones" placeholder="Describe las acciones realizadas al cierre...">${escapeHtml(r.medidasAcciones||'')}</textarea>
       </div>
@@ -1065,19 +1177,14 @@ function guardarEdicion(){
   if(!getFirmaDataURL('firmaEditCanvas')){showToast('⚠ Dibuja tu firma para guardar');return;}
   const nuevoEstado=selectedEditEstado||r.estado||'Abierto';
 
-  // Si va a cerrado, validar solo medidas (foto no obligatoria)
+  // Si va a cerrado, validar solo medidas
   if(nuevoEstado==='Cerrado'){
-    const tieneNuevaFoto=editPhotoLevDataURLs.length>0;
     const medidas=document.getElementById('editMedidasAcciones').value.trim();
     if(!medidas){
       showToast('⚠ Describe las medidas/acciones realizadas');
       return;
     }
     r.medidasAcciones=medidas;
-    if(tieneNuevaFoto){
-      r.fotosLevantamiento=editPhotoLevDataURLs;
-      r.linksFotosLevantamiento=[]; // se regenerarán al sincronizar
-    }
     if(r.estado!=='Cerrado'){
       r.fechaCierre=new Date().toISOString();
     }
@@ -1113,8 +1220,14 @@ function guardarEdicion(){
 
   closeEditModalBtn();
   renderReportes(); renderStats(); renderSeguimientos();
-  showToast('✓ Reporte actualizado'+(navigator.onLine?'':' (se sincronizará online)'));
+  mostrarAvisoNoRetirarse(
+    navigator.onLine
+      ? 'Espere hasta que el reporte se sincronice. No cierre ni salga de la aplicación.'
+      : 'Cambios guardados localmente. No se retire hasta que haya internet y se complete la sincronización.'
+  );
+  showToast('✓ Actualizado — no se retire hasta que sincronice');
   if(navigator.onLine) autoSync();
+  else actualizarAvisoPendiente();
 }
 
 /* ───── SEGUIMIENTOS ───── */
@@ -1788,16 +1901,71 @@ function renderStats(){
 }
 
 /* ───── SINCRONIZACIÓN ───── */
+let isSyncing=false;
+
+function hayPendientesSync(){
+  return getPending().length+getPendingUpdates().length>0;
+}
+
+function mostrarAvisoNoRetirarse(mensaje){
+  const overlay=document.getElementById('syncStayOverlay');
+  const msg=document.getElementById('syncStayMsg');
+  if(msg && mensaje) msg.textContent=mensaje;
+  if(overlay) overlay.hidden=false;
+  clearTimeout(mostrarAvisoNoRetirarse._t);
+  if(!isSyncing){
+    mostrarAvisoNoRetirarse._t=setTimeout(()=>{
+      if(!isSyncing){
+        ocultarAvisoNoRetirarse();
+        actualizarAvisoPendiente();
+      }
+    },7000);
+  }
+}
+
+function ocultarAvisoNoRetirarse(){
+  const overlay=document.getElementById('syncStayOverlay');
+  if(overlay) overlay.hidden=true;
+  clearTimeout(mostrarAvisoNoRetirarse._t);
+}
+
+function actualizarAvisoPendiente(){
+  const pendingBanner=document.getElementById('pendingStayBanner');
+  const overlay=document.getElementById('syncStayOverlay');
+  const overlayVisible=overlay && !overlay.hidden;
+  if(pendingBanner){
+    pendingBanner.classList.toggle('show', hayPendientesSync() && !isSyncing && !overlayVisible);
+  }
+}
+
+window.addEventListener('beforeunload', function(e){
+  if(isSyncing || hayPendientesSync()){
+    e.preventDefault();
+    e.returnValue='Hay reportes sin sincronizar. No se retire hasta que sincronice.';
+  }
+});
+
+document.addEventListener('click', function(e){
+  const overlay=document.getElementById('syncStayOverlay');
+  if(!overlay || overlay.hidden || isSyncing) return;
+  if(e.target===overlay){
+    ocultarAvisoNoRetirarse();
+    actualizarAvisoPendiente();
+  }
+});
+
 function updateSyncUI(){
   const online=navigator.onLine;
   const pending=getPending().length+getPendingUpdates().length; // solo colas, no allReportes
   const dot=document.getElementById('syncDot'), label=document.getElementById('syncLabel');
   document.getElementById('offlineBanner').classList.toggle('show',!online);
   if(!online){dot.className='sync-dot';label.textContent='offline';}
+  else if(isSyncing){dot.className='sync-dot syncing';label.textContent='sincronizando';}
   else if(pending){dot.className='sync-dot pending';label.textContent=pending+' pend.';}
   else{dot.className='sync-dot online';label.textContent='online';}
   const liveDot=document.getElementById('statsLiveDot');
   if(liveDot) liveDot.classList.toggle('is-offline', !online);
+  actualizarAvisoPendiente();
 }
 
 /* ───── ESTADÍSTICAS EN TIEMPO REAL ───── */
@@ -1860,13 +2028,18 @@ async function refrescarDatosEnVivo(){
 
 async function autoSync(){
   if(!navigator.onLine) return;
+  if(isSyncing) return;
   const pending=getPending();
   const pendingUpdates=getPendingUpdates();
   if(!pending.length && !pendingUpdates.length) return;
 
+  isSyncing=true;
+  clearTimeout(mostrarAvisoNoRetirarse._t);
   document.getElementById('syncDot').className='sync-dot syncing';
   document.getElementById('syncLabel').textContent='sincronizando';
   document.getElementById('syncBanner').classList.add('show');
+  mostrarAvisoNoRetirarse('Espere hasta que el reporte se sincronice. No cierre ni salga de la aplicación.');
+  actualizarAvisoPendiente();
 
   // ── 1) Sincronizar reportes nuevos ──
   // pending ahora contiene objetos completos (no solo IDs)
@@ -1902,7 +2075,7 @@ async function autoSync(){
         if(!esDataUrl(item)) continue;
         const link=await subirEvidenciaADrive(item, `entrega${i+1}`, 'entrega', r.id);
         if(link) linksEntrega.push(link);
-        else throw new Error('No se pudo subir foto de entrega '+(i+1)+' a Google Drive');
+        else throw new Error('No se pudo subir foto del personal '+(i+1)+' a Google Drive');
       }
       r.linksFotosEntrega=linksEntrega;
       r.fotosEntrega=[];
@@ -1958,11 +2131,13 @@ async function autoSync(){
       sincronizados.push(r.id);
     } catch(err) {
       console.error('Error subiendo reporte:', err);
+      isSyncing=false;
       document.getElementById('syncBanner').classList.remove('show');
+      mostrarAvisoNoRetirarse('No se pudo sincronizar. No se retire: el reporte sigue pendiente y se reintentará.');
       updateSyncUI();
       showToast(err.message&&err.message.indexOf('Drive')>=0
-        ? '⚠ '+err.message
-        : 'Sin conexión o error al subir evidencias a Drive; se reintentará');
+        ? '⚠ '+err.message+' — no se retire hasta que sincronice'
+        : '⚠ Error al subir evidencias. No se retire: se reintentará');
       // Guardar estado parcial (links Drive ya subidos se conservan)
       savePending(pending.filter(x=>!sincronizados.includes(x.id)));
       return;
@@ -2026,15 +2201,24 @@ async function autoSync(){
   }
   savePendingUpdates(remainingUpdates);
 
+  isSyncing=false;
   document.getElementById('syncBanner').classList.remove('show');
+  const quedaPendiente=hayPendientesSync();
+  if(quedaPendiente){
+    mostrarAvisoNoRetirarse('Aún hay reportes sin sincronizar. No se retire hasta que el envío se complete.');
+  } else {
+    ocultarAvisoNoRetirarse();
+  }
   updateSyncUI();
   renderReportes();
   renderStats();
   renderSeguimientos();
 
   const totalSync=sincronizados.length+(pendingUpdates.length-remainingUpdates.length);
-  if(totalSync>0){
-    showToast(`✓ ${totalSync} cambio${totalSync>1?'s':''} sincronizado${totalSync>1?'s':''}`);
+  if(totalSync>0 && !quedaPendiente){
+    showToast(`✓ ${totalSync} cambio${totalSync>1?'s':''} sincronizado${totalSync>1?'s':''}. Ya puede retirarse.`);
+  } else if(totalSync>0){
+    showToast(`✓ ${totalSync} sincronizado${totalSync>1?'s':''}. No se retire: aún hay pendientes.`);
   }
 }
 
@@ -2240,7 +2424,7 @@ function generarVale(id){
   <tr><td class="lbl">Reportante</td><td colspan="3">${r.reportador||REPORTANTE_DEFAULT}</td></tr>
   </table>
   ${r.estado==='Cerrado'?`<table><tr><td class="lbl">Fecha Cierre</td><td>${fd(r.fechaCierre)}</td><td class="lbl">Medidas</td><td style="white-space:pre-wrap;">${escapeHtml(r.medidasAcciones||'—')}</td></tr></table>`:''}
-  ${imgs(fH,'Fotos del Hallazgo')}${fE.length?imgs(fE,'Fotos de Entrega'):''}${fL.length?imgs(fL,'Fotos de Cierre'):''}
+  ${imgs(fH,'Fotos del Hallazgo')}${fE.length?imgs(fE,'Fotos del Personal'):''}${fL.length?imgs(fL,'Fotos de Cierre'):''}
   <div class="firmas"><div class="fb">${fsig(r.firmaRegistro,'Firma Registrador')}<div style="font-size:9px;color:#555;margin-top:2px;">${r.reportador||REPORTANTE_DEFAULT}</div></div>
   ${r.firmaEdicion&&r.firmaEdicion!=='null'?`<div class="fb">${fsig(r.firmaEdicion,'Firma Editor')}</div>`:''}</div>
   <div style="text-align:center;margin-top:20px;font-size:8px;color:#aaa;border-top:1px solid #eee;padding-top:6px;">CAMBIO DE EPPS — Compañía Minera Casma SAC — RUC 20606447192</div>
@@ -2268,7 +2452,7 @@ function exportarPDF(){
   const logo=logoPrintSrc();
   const h=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>CAMBIO DE EPPS</title><style>body{font:9px/1.4 Arial,sans-serif;margin:14px;}.hdr{display:flex;align-items:center;gap:10px;border-bottom:2px solid #1a2636;padding-bottom:8px;margin-bottom:10px;}.hdr img{width:55px;height:55px;object-fit:contain;}h1{font-size:12px;color:#1a2636;margin:0;}h2{font-size:9px;color:#555;margin:0;font-weight:normal;}.stamp{display:inline-block;background:#1a2636;color:#fff;font-size:10px;font-weight:700;letter-spacing:0.14em;padding:3px 8px;margin:4px 0;}table{width:100%;border-collapse:collapse;}th{background:#1a2636;color:#fff;padding:4px 3px;text-align:left;font-size:8px;text-transform:uppercase;white-space:nowrap;}td{padding:3px;border:1px solid #ddd;vertical-align:top;font-size:8px;}tr:nth-child(even){background:#f8f9fb;}@media print{body{margin:6px;}@page{size:A3 landscape;margin:8mm;}}</style></head><body>
   <div class="hdr"><img src="${logo}"><div><h1>COMPAÑÍA MINERA CASMA SAC</h1><div class="stamp">CAMBIO DE EPPS</div><h2>RUC: 20606447192 — Total: ${data.length} cambios | Generado: ${new Date().toLocaleDateString('es-PE')}</h2></div></div>
-  <table><thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Lugar</th><th>Riesgo</th><th>Descripción del Hallazgo</th><th>Foto hallazgo</th><th>Foto entrega</th><th>Medidas Correctivas</th><th>Foto lev.</th><th>Estado</th><th>Reportante</th><th style="min-width:90px;">Firma Registrador</th></tr></thead><tbody>${rows}</tbody></table>
+  <table><thead><tr><th>ID</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Lugar</th><th>Riesgo</th><th>Descripción del Hallazgo</th><th>Foto hallazgo</th><th>Foto personal</th><th>Medidas Correctivas</th><th>Foto lev.</th><th>Estado</th><th>Reportante</th><th style="min-width:90px;">Firma Registrador</th></tr></thead><tbody>${rows}</tbody></table>
   <div style="text-align:center;margin-top:10px;font-size:7px;color:#aaa;">CAMBIO DE EPPS — Compañía Minera Casma SAC — RUC 20606447192</div>
   <script>window.onload=()=>{const imgs=document.querySelectorAll("img");if(!imgs.length){setTimeout(()=>window.print(),500);return;}let loaded=0;const total=imgs.length;const tryPrint=()=>{loaded++;if(loaded>=total)setTimeout(()=>window.print(),300);};imgs.forEach(img=>{if(img.complete){tryPrint();}else{img.onload=tryPrint;img.onerror=tryPrint;}});setTimeout(()=>window.print(),6000);};<\/script></body></html>`;
   const w=window.open('','_blank');w.document.write(h);w.document.close();
@@ -2281,7 +2465,7 @@ async function exportarExcel(){
   if(!window.XLSX){await new Promise((r,j)=>{const s=document.createElement('script');s.src=EXCEL.cdn;s.onload=r;s.onerror=j;document.head.appendChild(s);});}
   const fd=f=>{if(!f)return'';try{return new Date(f).toLocaleDateString('es-PE');}catch{return f;}};
   const did=u=>{const m=u.match(/[?&]id=([\w-]+)/)||u.match(/\/d\/([\w-]+)/);return m?'https://lh3.googleusercontent.com/d/'+m[1]:u;};
-  const ws_data=[['ID','Fecha','Hora','Tipo','Ubicación','Riesgo','Categoría','EPPS cambiados','Descripción','Fotos Hallazgo','Fotos Entrega','Estado','Fotos Levantamiento','Medidas/Acciones','Reportador','Jefe inmediato','Persona Obs.','DNI Obs.','Fecha Cierre']];
+  const ws_data=[['ID','Fecha','Hora','Tipo','Ubicación','Riesgo','Categoría','EPPS cambiados','Descripción','Fotos Hallazgo','Fotos del Personal','Estado','Fotos Levantamiento','Medidas/Acciones','Reportador','Jefe inmediato','Persona Obs.','DNI Obs.','Fecha Cierre']];
   data.forEach(r=>{
     const fH=toArray(r.fotos).length?toArray(r.fotos):toArray(r.linksFotos);
     const fE=toArray(r.fotosEntrega).length?toArray(r.fotosEntrega):toArray(r.linksFotosEntrega);
