@@ -37,6 +37,35 @@
 
 <div id="app-shell" class="app-shell" hidden>
 
+<div id="roleGate" class="role-gate">
+  <img class="role-gate-logo" src="cita_minera_casma_sac-removebg-preview.png" alt="Minera Casma" width="72" height="72">
+  <p class="role-gate-brand">MINERA CASMA</p>
+  <h1 class="role-gate-title">Cambio de EPPS</h1>
+  <p class="role-gate-lead">¿Quién va a usar la aplicación?</p>
+  <button type="button" class="role-card" onclick="entrarComoUsuario()">
+    <span class="role-card-icon">👷</span>
+    <span class="role-card-text">
+      <strong>Usuario de almacén</strong>
+      <em>Solo registrar vales de cambio de EPPS</em>
+    </span>
+  </button>
+  <button type="button" class="role-card" onclick="mostrarPinAdmin()">
+    <span class="role-card-icon">🛡️</span>
+    <span class="role-card-text">
+      <strong>Administrador</strong>
+      <em>Ver reportes, seguimientos y estadísticas</em>
+    </span>
+  </button>
+  <form id="adminPinWrap" class="role-pin" hidden onsubmit="entrarComoAdmin(event)">
+    <label class="form-label" for="adminPinInput">Clave de administrador</label>
+    <input type="password" id="adminPinInput" maxlength="24" autocomplete="off" placeholder="Ingrese la clave">
+    <p class="role-pin-error" id="adminPinError" hidden>Clave incorrecta</p>
+    <button type="submit" class="btn-submit" style="margin-top:10px;">Entrar</button>
+  </form>
+</div>
+
+<div id="appMain" hidden>
+
 <div class="banner banner-offline" id="offlineBanner"><span>⚠</span> Sin conexión — los reportes se guardarán localmente. No se retire hasta que sincronice.</div>
 <div class="banner banner-sync"    id="syncBanner"><span>⚠</span> No se retire — sincronizando evidencias. No cierre ni salga de la app.</div>
 <div class="banner banner-pending" id="pendingStayBanner"><span>⚠</span> Hay reportes sin sincronizar. No se retire hasta que el envío se complete.</div>
@@ -46,17 +75,20 @@
     <img class="app-logo" src="cita_minera_casma_sac-removebg-preview.png"
          alt="Compañía Minera Casma SAC" width="40" height="40">
     <div class="app-title-block">
-      <div class="app-title">Registro de cambio <span>EPPS</span></div>
-      <div class="app-subtitle">CIA CASMA · Vale de almacén</div>
+      <div class="app-title">Cambios de <span>EPPS</span></div>
+      <div class="app-subtitle" id="appSubtitle">CIA CASMA · Vale de almacén</div>
     </div>
   </div>
-  <button class="sync-badge" onclick="manualSync()" title="Sincronizar">
-    <span class="sync-dot" id="syncDot"></span>
-    <span id="syncLabel">offline</span>
-  </button>
+  <div class="header-actions">
+    <button type="button" class="role-chip" id="roleChip" onclick="cambiarRol()" title="Cambiar de usuario">Usuario</button>
+    <button class="sync-badge" onclick="manualSync()" title="Sincronizar">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncLabel">offline</span>
+    </button>
+  </div>
 </header>
 
-<div class="info-banner" role="status">
+<div class="info-banner info-banner-user" role="status">
   <span class="info-banner-icon" aria-hidden="true">⚡</span>
   <div class="info-banner-text">
     <strong>Cada registro es inmediato.</strong>
@@ -65,10 +97,10 @@
 </div>
 
 <div class="tabs">
-  <button class="tab active" onclick="showTab('nuevo')">＋ Nuevo</button>
-  <button class="tab" onclick="showTab('reportes')">Reportes</button>
-  <button class="tab" onclick="showTab('seguimientos')">Seguimientos<span class="tab-badge" id="segBadge" style="display:none">0</span></button>
-  <button class="tab" onclick="showTab('stats')">Estadísticas</button>
+  <button class="tab tab-user tab-solo-usuario active" data-tab="nuevo" onclick="showTab('nuevo')">＋ Nuevo</button>
+  <button class="tab tab-user" data-tab="reportes" onclick="showTab('reportes')">Reportes</button>
+  <button class="tab tab-user" data-tab="seguimientos" onclick="showTab('seguimientos')">Seguimientos<span class="tab-badge" id="segBadge" style="display:none">0</span></button>
+  <button class="tab tab-admin" data-tab="stats" onclick="showTab('stats')">Estadísticas</button>
 </div>
 
 <!-- TAB: NUEVO REPORTE -->
@@ -87,7 +119,7 @@
       <div class="chip" data-value="Abierto" onclick="selectEstado(this)">● Abierto</div>
       <div class="chip sel-cerrado" data-value="Cerrado" onclick="selectEstado(this)">● Cerrado</div>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:6px;">Por defecto el reporte nace <strong>Cerrado</strong>. Complete las acciones realizadas.</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px;">Por defecto el reporte nace <strong>Cerrado</strong>. Las acciones realizadas son opcionales.</div>
   </div>
 
   <div class="form-section">
@@ -128,21 +160,9 @@
       oninput="actualizarContadorDesc()"
       placeholder="Motivo u observación: estado del EPP retirado (roto, vencido, perdido), labor o zona, y cualquier detalle que almacén deba saber."></textarea>
     <div class="desc-hint">
-      Tipo, talla y cantidad van arriba. Aquí solo el motivo del cambio.
+      Tipo, talla y cantidad van arriba. Aquí el motivo del cambio, con al menos 20 palabras.
     </div>
-    <div class="desc-counter" id="descCounter">Mínimo 40 caracteres · 0/40</div>
-  </div>
-
-
-
-  <div class="form-section">
-    <label class="form-label">Responsable de Atención (ALMACEN)  <span class="form-required">*</span></label>
-    <div style="position:relative;">
-      <input type="text" id="responsable" placeholder="Buscar por DNI o nombre..."
-             autocomplete="off" oninput="buscarResponsable()" onfocus="buscarResponsable()">
-      <div id="responsableDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
-    </div>
-    <div class="dni-status" id="responsableStatus"></div>
+    <div class="desc-counter" id="descCounter">Mínimo 20 palabras · 0/20</div>
   </div>
 
   <div class="divider"></div>
@@ -251,7 +271,7 @@
     <input type="file" id="inputGaleriaEntrega" accept="image/*" multiple style="display:none" onchange="handlePhotos(this, 'entrega')">
     <input type="file" id="inputCamaraEntrega" accept="image/*" capture="user" style="display:none" onchange="handlePhotos(this, 'entrega')">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <button type="button" onclick="document.getElementById('inputCamaraEntrega').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
+      <button type="button" onclick="abrirCamaraRostro()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
         <span style="font-size:26px;">📷</span>
         <span>Tomar foto</span>
       </button>
@@ -260,7 +280,9 @@
         <span>Galería</span>
       </button>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center;">Obligatorio: foto de la persona que recibe el EPP. Máximo 5 fotos.</div>
+    <div class="rostro-form-hint" id="entregaRostroHint">
+      <strong>Cómo tomar la foto:</strong> el rostro de quien recibe debe quedar <strong>al centro</strong>, mirando a la cámara, con el EPP nuevo visible. La guía le irá indicando si debe acercarse, alejarse o moverse.
+    </div>
     <div class="photos-grid" id="photosEntregaPreview"></div>
   </div>
 
@@ -268,8 +290,8 @@
   <div id="seccionLevantamiento" style="display:block;">
     <div class="divider"></div>
     <div class="form-section">
-      <label class="form-label">Acciones realizadas al cierre <span class="form-required">*</span></label>
-      <textarea id="medidasAcciones" placeholder="Describe las acciones: entrega del EPP, talla, y lo que se retiró..."></textarea>
+      <label class="form-label">Acciones realizadas al cierre</label>
+      <textarea id="medidasAcciones" placeholder="Opcional. Describe las acciones: entrega del EPP, talla, y lo que se retiró..."></textarea>
     </div>
   </div>
 
@@ -402,6 +424,23 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Cámara con guía de rostro centrado (foto de quien recibe) -->
+<div id="rostroCamOverlay" class="rostro-cam" hidden>
+  <div class="rostro-cam-stage" id="rostroCamStage">
+    <video id="rostroCamVideo" autoplay muted playsinline webkit-playsinline></video>
+    <canvas id="rostroCamCanvas" class="rostro-cam-canvas"></canvas>
+    <div class="rostro-cam-oval" id="rostroCamOval" aria-hidden="true"></div>
+  </div>
+  <div class="rostro-cam-hint is-warn" id="rostroCamHint">Coloque el rostro de quien recibe al centro del óvalo.</div>
+  <div class="rostro-cam-bar">
+    <button type="button" class="rostro-cam-cancel" onclick="cerrarCamaraRostro()">Cancelar</button>
+    <button type="button" class="rostro-cam-shutter" id="rostroCamShutter" disabled onclick="capturarFotoRostro()" aria-label="Capturar foto">
+      <span></span>
+    </button>
+    <div class="rostro-cam-bar-spacer" aria-hidden="true"></div>
+  </div>
+</div>
+
 <div id="syncStayOverlay" class="sync-stay-overlay" hidden>
   <div class="sync-stay-card" role="alertdialog" aria-modal="true" aria-labelledby="syncStayTitle" aria-describedby="syncStayMsg">
     <div class="sync-stay-icon" aria-hidden="true">⏳</div>
@@ -411,6 +450,7 @@
   </div>
 </div>
 
+</div><!-- /#appMain -->
 </div><!-- /#app-shell -->
 
 <!-- Config: Drive, Excel, Apps Script → js/config.js -->

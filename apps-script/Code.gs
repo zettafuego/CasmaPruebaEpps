@@ -41,7 +41,9 @@ const CONFIG = {
 
 // Columnas de la hoja Reportes (orden fijo — no reordenar: el Sheet ya tiene este layout).
 // Campos que el formulario ya no pide (nivelRiesgo, causaProbable, dni/área/cargo
-// del reportante, linksFotosLevantamiento) se dejan para no desfasar columnas.
+// del reportante, responsable de almacén, linksFotosLevantamiento) se dejan
+// para no desfasar columnas. Acciones de cierre son opcionales. Observaciones
+// (descripcion) siguen siendo obligatorias en el formulario (mín. 20 palabras).
 const COLS_REPORTE = [
   'id', 'estado', 'tipo', 'nivelRiesgo', 'categoria', 'causaProbable',
   'descripcion', 'responsable', 'ubicacion',

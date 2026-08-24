@@ -69,3 +69,11 @@ const APP = {
   ruc: '20606447192',
   logo: 'cita_minera_casma_sac-removebg-preview.png',
 };
+
+// ── Roles ─────────────────────────────────────────────────────────
+// Usuario: solo registrar vales.
+// Administrador: reportes, seguimientos y estadísticas (pide clave).
+const ROLES = {
+  adminPin: 'casmaepps2026',
+  storageKey: 'casma_epps_rol',
+};

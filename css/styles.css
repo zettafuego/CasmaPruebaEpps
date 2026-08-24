@@ -306,6 +306,139 @@ body.splash-on {
   display: none !important;
 }
 
+#appMain[hidden],
+#roleGate[hidden] {
+  display: none !important;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.role-chip {
+  font-size: 11px;
+  font-family: var(--sans);
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  min-height: 36px;
+  white-space: nowrap;
+}
+.role-chip:active {
+  transform: scale(0.96);
+}
+body.rol-admin .role-chip {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+body.rol-usuario .tab-admin,
+body.rol-usuario .tabs,
+body.rol-usuario #tab-stats,
+body.rol-usuario #tab-reportes,
+body.rol-usuario #tab-seguimientos {
+  display: none !important;
+}
+body.rol-admin .tab-solo-usuario,
+body.rol-admin #tab-nuevo,
+body.rol-admin .info-banner-user {
+  display: none !important;
+}
+
+.role-gate {
+  min-height: 100dvh;
+  padding: 32px 20px calc(32px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--bg);
+}
+.role-gate-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  margin-bottom: 10px;
+}
+.role-gate-brand {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  color: var(--text3);
+}
+.role-gate-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 4px 0 18px;
+}
+.role-gate-lead {
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 16px;
+}
+.role-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  padding: 16px;
+  margin-bottom: 10px;
+  background: var(--surface);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: var(--sans);
+  color: var(--text);
+}
+.role-card:active {
+  transform: scale(0.98);
+  border-color: var(--accent);
+}
+.role-card-icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.role-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.role-card-text strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+.role-card-text em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.35;
+}
+.role-pin {
+  width: 100%;
+  max-width: 380px;
+  margin-top: 8px;
+  text-align: left;
+}
+.role-pin-error {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--danger);
+}
+
 /* Intro un poco más grande en tablet (sigue mobile-first) */
 @media (min-width: 600px) {
   .splash-logo-wrap {
@@ -2162,6 +2295,158 @@ select option {
   .modal-handle {
     display: none;
   }
+}
+
+/* Guía de rostro centrado — foto de quien recibe */
+.rostro-form-hint {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+}
+.rostro-form-hint.is-ok {
+  background: var(--success-dim);
+  border-color: var(--success);
+  color: var(--success);
+}
+.rostro-form-hint.is-warn {
+  background: var(--warning-dim);
+  border-color: var(--warning);
+  color: var(--text);
+}
+.rostro-form-hint.is-bad {
+  background: var(--danger-dim);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.rostro-cam {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: #0a0a0a;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+}
+.rostro-cam[hidden] {
+  display: none !important;
+}
+
+.rostro-cam-stage {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  transform: scaleX(-1);
+  background: #111;
+}
+.rostro-cam-stage video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.rostro-cam-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.rostro-cam-oval {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(72vw, 300px);
+  height: min(92vw, 390px);
+  transform: translate(-50%, -50%);
+  border: 3px solid rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.rostro-cam-oval.is-ok {
+  border-color: #1a9e5c;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.38), 0 0 28px rgba(26, 158, 92, 0.65);
+}
+.rostro-cam-oval.is-warn {
+  border-color: #d4820a;
+}
+.rostro-cam-oval.is-bad {
+  border-color: #d63b3b;
+}
+
+.rostro-cam-hint {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: calc(12px + var(--safe-top));
+  z-index: 2;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.78);
+}
+.rostro-cam-hint.is-ok { background: rgba(26, 158, 92, 0.94); }
+.rostro-cam-hint.is-warn { background: rgba(212, 130, 10, 0.94); color: #1a1204; }
+.rostro-cam-hint.is-bad { background: rgba(214, 59, 59, 0.94); }
+
+.rostro-cam-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px calc(16px + var(--safe-bottom));
+  background: #0d0d0d;
+  z-index: 2;
+}
+.rostro-cam-cancel {
+  min-width: 88px;
+  padding: 12px 10px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 15px;
+  cursor: pointer;
+}
+.rostro-cam-bar-spacer {
+  min-width: 88px;
+}
+.rostro-cam-shutter {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: #2a2a2a;
+  padding: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.rostro-cam-shutter span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #fff;
+}
+.rostro-cam-shutter:not(:disabled) span {
+  background: #1a9e5c;
+}
+.rostro-cam-shutter:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
 }
 
 /* Preferencia de menos movimiento */

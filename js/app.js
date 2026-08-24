@@ -32,7 +32,7 @@ const savePersonal=d=>localStorage.setItem(PERSONAL_KEY,JSON.stringify(d));
 const REPORTANTE_DEFAULT='SSOMA';
 
 let selectedTipo='', selectedRiesgo='', selectedEstado='Cerrado';
-const DESC_MIN=40;
+const DESC_MIN_PALABRAS=20;
 const TIPOS_EPP=['Casco','Botas','Lentes','Respirador','Guantes','Protector auditivo','Overol','Otro'];
 const TALLA_HINT={
   Casco:'S / M / L',
@@ -52,6 +52,7 @@ let editPhotoLevDataURLs=[];
 let currentEditId=null;
 let introFinalizado=false;
 let appInicializada=false;
+let appRol=null;
 
 /**
  * Intro estilo Netflix → luego muestra la app (mobile-first).
@@ -70,6 +71,100 @@ function finalizarIntro(){
     if(splash&&splash.parentNode) splash.remove();
   },600);
   iniciarAppPrincipal();
+  const rol=leerRolSesion();
+  if(rol==='usuario'||rol==='admin') aplicarRol(rol,false);
+  else mostrarSelectorRol();
+}
+
+function rolStorageKey(){
+  return (typeof ROLES!=='undefined' && ROLES.storageKey) || 'casma_epps_rol';
+}
+function leerRolSesion(){
+  try{ return sessionStorage.getItem(rolStorageKey()); }catch(e){ return null; }
+}
+function guardarRolSesion(rol){
+  try{
+    if(rol) sessionStorage.setItem(rolStorageKey(), rol);
+    else sessionStorage.removeItem(rolStorageKey());
+  }catch(e){}
+}
+function pinAdmin(){
+  return String((typeof ROLES!=='undefined' && ROLES.adminPin) || '').trim();
+}
+
+function mostrarSelectorRol(){
+  appRol=null;
+  document.body.classList.remove('rol-usuario','rol-admin');
+  const gate=document.getElementById('roleGate');
+  const main=document.getElementById('appMain');
+  if(gate) gate.hidden=false;
+  if(main) main.hidden=true;
+  const wrap=document.getElementById('adminPinWrap');
+  const err=document.getElementById('adminPinError');
+  const pin=document.getElementById('adminPinInput');
+  if(wrap) wrap.hidden=true;
+  if(err) err.hidden=true;
+  if(pin) pin.value='';
+}
+
+function entrarComoUsuario(){
+  aplicarRol('usuario', true);
+}
+
+function mostrarPinAdmin(){
+  const wrap=document.getElementById('adminPinWrap');
+  const pin=document.getElementById('adminPinInput');
+  const err=document.getElementById('adminPinError');
+  if(err) err.hidden=true;
+  if(wrap) wrap.hidden=false;
+  if(pin){
+    pin.value='';
+    setTimeout(()=>pin.focus(),50);
+  }
+}
+
+function entrarComoAdmin(e){
+  if(e) e.preventDefault();
+  const pin=(document.getElementById('adminPinInput')?.value||'').trim();
+  const err=document.getElementById('adminPinError');
+  if(!pinAdmin() || pin!==pinAdmin()){
+    if(err) err.hidden=false;
+    return;
+  }
+  if(err) err.hidden=true;
+  aplicarRol('admin', true);
+}
+
+function cambiarRol(){
+  guardarRolSesion(null);
+  mostrarSelectorRol();
+}
+
+function aplicarRol(rol, persist){
+  if(rol!=='usuario' && rol!=='admin') return;
+  appRol=rol;
+  if(persist!==false) guardarRolSesion(rol);
+  document.body.classList.remove('rol-usuario','rol-admin');
+  document.body.classList.add(rol==='admin'?'rol-admin':'rol-usuario');
+  const gate=document.getElementById('roleGate');
+  const main=document.getElementById('appMain');
+  if(gate) gate.hidden=true;
+  if(main) main.hidden=false;
+  const chip=document.getElementById('roleChip');
+  if(chip) chip.textContent=rol==='admin'?'Admin':'Usuario';
+  const sub=document.getElementById('appSubtitle');
+  if(sub){
+    sub.textContent=rol==='admin'
+      ? 'CIA CASMA · Administración'
+      : 'CIA CASMA · Vale de almacén';
+  }
+  showTab(rol==='admin'?'stats':'nuevo');
+}
+
+function puedeVerTab(tab){
+  if(appRol==='admin') return tab==='stats'||tab==='reportes'||tab==='seguimientos';
+  if(appRol==='usuario') return tab==='nuevo';
+  return false;
 }
 
 function iniciarAppPrincipal(){
@@ -118,11 +213,13 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 function showTab(tab){
+  if(!puedeVerTab(tab)) return;
   ['nuevo','reportes','seguimientos','stats'].forEach(t=>{
-    document.getElementById('tab-'+t).style.display=t===tab?'block':'none';
+    const pane=document.getElementById('tab-'+t);
+    if(pane) pane.style.display=t===tab?'block':'none';
   });
-  document.querySelectorAll('.tab').forEach((el,i)=>{
-    el.classList.toggle('active',['nuevo','reportes','seguimientos','stats'][i]===tab);
+  document.querySelectorAll('.tab').forEach(el=>{
+    el.classList.toggle('active', el.dataset.tab===tab);
   });
   if(tab==='reportes') renderReportes();
   if(tab==='seguimientos') renderSeguimientos();
@@ -474,55 +571,6 @@ function autocompletarPorDniSiExacto(q, resultados, aplicar){
   return false;
 }
 
-// ── Responsable acción correctiva: autocomplete por DNI (preferente) o nombre ──
-function buscarResponsable(){
-  const q = (document.getElementById('responsable').value||'').trim();
-  const dd = document.getElementById('responsableDropdown');
-  const status = document.getElementById('responsableStatus');
-  if(!dd) return;
-  if(!q){ dd.style.display='none'; return; }
-
-  const resultados = buscarPersonal(q);
-
-  if(!resultados.length){
-    dd.style.display='none';
-    if(status){
-      status.className='dni-status notfound';
-      status.textContent='Sin coincidencia por DNI — puede escribir el nombre igual';
-    }
-    return;
-  }
-
-  if(autocompletarPorDniSiExacto(q, resultados, p=>seleccionarResponsableObj(p))) return;
-
-  dd.innerHTML = resultados.map((p,i)=>htmlOpcionPersona(p,i,'seleccionarResponsable')).join('');
-  dd._results = resultados;
-  dd.style.display='block';
-  if(status){
-    status.className='dni-status';
-    status.textContent='Seleccione de la lista (preferencia por DNI)';
-  }
-}
-
-function seleccionarResponsable(idx){
-  const dd = document.getElementById('responsableDropdown');
-  const p = dd._results[idx];
-  if(!p) return;
-  seleccionarResponsableObj(p);
-}
-
-function seleccionarResponsableObj(p){
-  if(!p) return;
-  document.getElementById('responsable').value = p.nombre||'';
-  const dd = document.getElementById('responsableDropdown');
-  if(dd) dd.style.display='none';
-  const status = document.getElementById('responsableStatus');
-  if(status){
-    status.className='dni-status found';
-    status.textContent='✓ DNI '+escapeHtml(p.dni||'')+' — '+escapeHtml(p.nombre||'');
-  }
-}
-
 // ── Jefe inmediato: autocomplete por DNI (preferente) o nombre ──
 function buscarJefeInmediato(){
   const q = (document.getElementById('jefeInmediato').value||'').trim();
@@ -584,7 +632,6 @@ document.addEventListener('click', e=>{
   [
     {id:'observadoDropdown',  inputId:'persona'},
     {id:'dniObservadoDropdown',inputId:'dniObservado'},
-    {id:'responsableDropdown',inputId:'responsable'},
     {id:'jefeInmediatoDropdown',inputId:'jefeInmediato'},
   ].forEach(({id, inputId})=>{
     const dd=document.getElementById(id);
@@ -637,17 +684,30 @@ function handlePhotos(input, modo){
         if(target.length>=5) return;
         const img = new Image();
         img.onload = () => {
-          const MAX=1024;
-          let w=img.width, h=img.height;
-          if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
-          const canvas=document.createElement('canvas');
-          canvas.width=w; canvas.height=h;
-          canvas.getContext('2d').drawImage(img,0,0,w,h);
-          const compressed=canvas.toDataURL('image/jpeg',0.7);
-          if(target.length<5){
-            target.push(compressed);
+          const comprimir=()=>{
+            const MAX=1024;
+            let w=img.width, h=img.height;
+            if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+            const canvas=document.createElement('canvas');
+            canvas.width=w; canvas.height=h;
+            canvas.getContext('2d').drawImage(img,0,0,w,h);
+            return canvas.toDataURL('image/jpeg',0.7);
+          };
+          const aceptar=()=>{
+            if(target.length>=5) return;
+            target.push(comprimir());
             renderPhotosPreview(modo);
-          }
+            if(modo==='entrega') actualizarHintEntrega({ok:true});
+          };
+          if(modo!=='entrega'){ aceptar(); return; }
+          validarImagenRostro(img).then(check=>{
+            if(check && check.ok===false){
+              showToast('⚠ '+check.msg);
+              actualizarHintEntrega(check);
+              return;
+            }
+            aceptar();
+          }).catch(()=>aceptar());
         };
         img.onerror=()=>showToast('❌ No se pudo procesar la imagen');
         img.src=e.target.result;
@@ -673,21 +733,365 @@ function renderPhotosPreview(modo){
 }
 
 function removePhoto(i){photoDataURLs.splice(i,1);renderPhotosPreview('hallazgo');}
-function removePhotoEntrega(i){photoEntregaDataURLs.splice(i,1);renderPhotosPreview('entrega');}
+function removePhotoEntrega(i){
+  photoEntregaDataURLs.splice(i,1);
+  renderPhotosPreview('entrega');
+  actualizarHintEntrega(photoEntregaDataURLs.length?{ok:true}:null);
+}
 function removePhotoLev(i){photoLevDataURLs.splice(i,1);renderPhotosPreview('levantamiento');}
 function removeEditPhotoLev(i){editPhotoLevDataURLs.splice(i,1);renderPhotosPreview('editLev');}
 
+/* ───── ROSTRO CENTRADO — foto de quien recibe ───── */
+const ROSTRO_HINT_DEFAULT='<strong>Cómo tomar la foto:</strong> el rostro de quien recibe debe quedar <strong>al centro</strong>, mirando a la cámara, con el EPP nuevo visible. La guía le irá indicando si debe acercarse, alejarse o moverse.';
+const ROSTRO_CENTER=0.12;
+const ROSTRO_SIZE_MIN=0.18;
+const ROSTRO_SIZE_MAX=0.52;
+const ROSTRO_OK_STREAK=3;
+
+let faceEngine=null;
+let faceEnginePromise=null;
+let rostroStream=null;
+let rostroRaf=0;
+let rostroLastDetect=0;
+let rostroOkStreak=0;
+let rostroCamAbierta=false;
+let rostroCapturando=false;
+let rostroDetecting=false;
+
+function actualizarHintEntrega(result){
+  const el=document.getElementById('entregaRostroHint');
+  if(!el) return;
+  if(!result || !photoEntregaDataURLs.length){
+    el.className='rostro-form-hint';
+    el.innerHTML=ROSTRO_HINT_DEFAULT;
+    return;
+  }
+  if(result.ok){
+    el.className='rostro-form-hint is-ok';
+    el.textContent='✓ Rostro centrado detectado. Foto válida de quien recibe el EPP.';
+    return;
+  }
+  el.className='rostro-form-hint is-bad';
+  el.textContent=result.msg||'No se reconoció un rostro centrado. Tome otra foto.';
+}
+
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    const file=src.split('/').pop();
+    if([...document.scripts].some(s=>(s.src||'').includes(file))){ resolve(); return; }
+    const s=document.createElement('script');
+    s.src=src;
+    s.onload=()=>resolve();
+    s.onerror=()=>reject(new Error('No se pudo cargar '+src));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureFaceEngine(){
+  if(faceEngine) return faceEngine;
+  if(faceEnginePromise) return faceEnginePromise;
+  faceEnginePromise=(async()=>{
+    if(typeof FaceDetector==='function'){
+      try{
+        const det=new FaceDetector({fastMode:true, maxDetectedFaces:3});
+        faceEngine={type:'native', det};
+        return faceEngine;
+      }catch(e){ /* usar BlazeFace */ }
+    }
+    try{
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js');
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js');
+      if(window.tf && window.tf.ready) await window.tf.ready();
+      const model=await blazeface.load();
+      faceEngine={type:'blaze', model};
+      return faceEngine;
+    }catch(e){
+      faceEngine={type:'none'};
+      return faceEngine;
+    }
+  })();
+  return faceEnginePromise;
+}
+
+async function detectarRostros(source){
+  const engine=await ensureFaceEngine();
+  if(!engine || engine.type==='none') return null;
+  try{
+    if(engine.type==='native'){
+      const faces=await engine.det.detect(source);
+      return (faces||[]).map(f=>{
+        const b=f.boundingBox;
+        return {x:b.x, y:b.y, width:b.width, height:b.height};
+      });
+    }
+    if(engine.type==='blaze'){
+      const preds=await engine.model.estimateFaces(source, false);
+      return (preds||[]).map(p=>{
+        const x1=p.topLeft[0], y1=p.topLeft[1];
+        const x2=p.bottomRight[0], y2=p.bottomRight[1];
+        return {x:x1, y:y1, width:x2-x1, height:y2-y1};
+      });
+    }
+  }catch(e){
+    return [];
+  }
+  return [];
+}
+
+function evaluarRostro(faces, frameW, frameH, espejo){
+  if(!faces || !faces.length){
+    return {ok:false, tone:'bad', msg:'No se ve un rostro. Mire a la cámara, con el EPP nuevo visible.'};
+  }
+  const ranked=[...faces].sort((a,b)=>(b.width*b.height)-(a.width*a.height));
+  if(ranked.length>1 && ranked[1].width*ranked[1].height > ranked[0].width*ranked[0].height*0.45){
+    return {ok:false, tone:'warn', msg:'Hay más de un rostro. Quede solo quien recibe el EPP al centro.'};
+  }
+  const f=ranked[0];
+  const cx=f.x+f.width/2;
+  const cy=f.y+f.height/2;
+  let dx=(cx-frameW/2)/frameW;
+  const dy=(cy-frameH/2)/frameH;
+  if(espejo) dx=-dx;
+  const size=f.width/frameW;
+
+  if(size<ROSTRO_SIZE_MIN){
+    return {ok:false, tone:'warn', msg:'Acérquese. El rostro debe verse más grande y al centro del óvalo.'};
+  }
+  if(size>ROSTRO_SIZE_MAX){
+    return {ok:false, tone:'warn', msg:'Aléjese un poco. Debe verse el rostro y el EPP nuevo.'};
+  }
+
+  const offX=Math.abs(dx)>ROSTRO_CENTER;
+  const offY=Math.abs(dy)>ROSTRO_CENTER;
+  if(offX || offY){
+    const partes=[];
+    if(dx<-ROSTRO_CENTER) partes.push('a la derecha');
+    else if(dx>ROSTRO_CENTER) partes.push('a la izquierda');
+    if(dy<-ROSTRO_CENTER) partes.push('abajo');
+    else if(dy>ROSTRO_CENTER) partes.push('arriba');
+    return {ok:false, tone:'warn', msg:'Mueva el rostro '+partes.join(' y ')+' para centrarlo en el óvalo.'};
+  }
+  return {ok:true, tone:'ok', msg:'Rostro centrado. Capture la foto de quien recibe el EPP.'};
+}
+
+async function validarImagenRostro(img){
+  const faces=await detectarRostros(img);
+  if(faces===null) return {ok:true, skipped:true};
+  const w=img.naturalWidth||img.width;
+  const h=img.naturalHeight||img.height;
+  return evaluarRostro(faces, w, h, false);
+}
+
+function mapVideoRectToView(face, video, viewW, viewH){
+  const vw=video.videoWidth, vh=video.videoHeight;
+  if(!vw||!vh) return face;
+  const scale=Math.max(viewW/vw, viewH/vh);
+  const dw=vw*scale, dh=vh*scale;
+  const ox=(viewW-dw)/2;
+  const oy=(viewH-dh)/2;
+  return {
+    x:face.x*scale+ox,
+    y:face.y*scale+oy,
+    width:face.width*scale,
+    height:face.height*scale
+  };
+}
+
+function setRostroUi(check){
+  const hint=document.getElementById('rostroCamHint');
+  const oval=document.getElementById('rostroCamOval');
+  const shutter=document.getElementById('rostroCamShutter');
+  const tone=(check&&check.tone)||'warn';
+  if(hint){
+    hint.className='rostro-cam-hint is-'+tone;
+    hint.textContent=check&&check.msg?check.msg:'Coloque el rostro de quien recibe al centro del óvalo.';
+  }
+  if(oval) oval.className='rostro-cam-oval is-'+tone;
+  if(shutter) shutter.disabled=!(check&&check.ok);
+}
+
+function dibujarRostrosCanvas(facesView, check){
+  const canvas=document.getElementById('rostroCamCanvas');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!facesView||!facesView.length) return;
+  const color=check&&check.ok?'#1a9e5c':(check&&check.tone==='bad'?'#d63b3b':'#d4820a');
+  ctx.strokeStyle=color;
+  ctx.lineWidth=3;
+  facesView.forEach(f=>{
+    const r=18;
+    const x=f.x, y=f.y, w=f.width, h=f.height;
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.stroke();
+  });
+}
+
+function syncRostroCanvasSize(){
+  const stage=document.getElementById('rostroCamStage');
+  const canvas=document.getElementById('rostroCamCanvas');
+  if(!stage||!canvas) return {w:0,h:0};
+  const r=stage.getBoundingClientRect();
+  const w=Math.round(r.width), h=Math.round(r.height);
+  if(canvas.width!==w||canvas.height!==h){
+    canvas.width=w;
+    canvas.height=h;
+  }
+  return {w,h};
+}
+
+async function loopRostroCam(ts){
+  if(!rostroCamAbierta) return;
+  rostroRaf=requestAnimationFrame(loopRostroCam);
+  if(rostroDetecting || ts-rostroLastDetect<140) return;
+  rostroLastDetect=ts;
+  const video=document.getElementById('rostroCamVideo');
+  if(!video||!video.videoWidth) return;
+  const {w,h}=syncRostroCanvasSize();
+  if(!w||!h) return;
+  rostroDetecting=true;
+  try{
+    const faces=await detectarRostros(video);
+    if(!rostroCamAbierta) return;
+    if(faces===null){
+      setRostroUi({ok:true, tone:'ok', msg:'Centre el rostro en el óvalo y capture. (Detector no disponible)'});
+      dibujarRostrosCanvas([], {ok:true});
+      return;
+    }
+    const mapped=faces.map(f=>mapVideoRectToView(f, video, w, h));
+    const check=evaluarRostro(mapped, w, h, true);
+    if(check.ok) rostroOkStreak++;
+    else rostroOkStreak=0;
+    const ready=check.ok && rostroOkStreak>=ROSTRO_OK_STREAK;
+    setRostroUi(ready?check:{...check, ok:false, msg:check.ok?'Mantenga el rostro quieto un momento…':check.msg, tone:check.ok?'warn':check.tone});
+    dibujarRostrosCanvas(mapped, check);
+  }finally{
+    rostroDetecting=false;
+  }
+}
+
+async function abrirCamaraRostro(){
+  if(photoEntregaDataURLs.length>=5){
+    showToast('Máximo 5 fotos de quien recibe');
+    return;
+  }
+  const overlay=document.getElementById('rostroCamOverlay');
+  const video=document.getElementById('rostroCamVideo');
+  if(!overlay||!video) return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    document.getElementById('inputCamaraEntrega').click();
+    return;
+  }
+  try{
+    overlay.hidden=false;
+    document.body.style.overflow='hidden';
+    setRostroUi({ok:false, tone:'warn', msg:'Activando cámara… coloque el rostro de quien recibe al centro.'});
+    const engineP=ensureFaceEngine();
+    rostroStream=await navigator.mediaDevices.getUserMedia({
+      audio:false,
+      video:{facingMode:{ideal:'user'}, width:{ideal:1280}, height:{ideal:720}}
+    });
+    video.srcObject=rostroStream;
+    await video.play();
+    rostroCamAbierta=true;
+    rostroOkStreak=0;
+    rostroCapturando=false;
+    rostroDetecting=false;
+    syncRostroCanvasSize();
+    await engineP;
+    if(!rostroCamAbierta) return;
+    cancelAnimationFrame(rostroRaf);
+    rostroRaf=requestAnimationFrame(loopRostroCam);
+  }catch(e){
+    cerrarCamaraRostro();
+    document.getElementById('inputCamaraEntrega').click();
+  }
+}
+
+function cerrarCamaraRostro(){
+  rostroCamAbierta=false;
+  rostroCapturando=false;
+  cancelAnimationFrame(rostroRaf);
+  rostroRaf=0;
+  const video=document.getElementById('rostroCamVideo');
+  if(video){
+    video.pause();
+    video.srcObject=null;
+  }
+  if(rostroStream){
+    rostroStream.getTracks().forEach(t=>t.stop());
+    rostroStream=null;
+  }
+  const overlay=document.getElementById('rostroCamOverlay');
+  if(overlay) overlay.hidden=true;
+  document.body.style.overflow='';
+  const canvas=document.getElementById('rostroCamCanvas');
+  if(canvas){
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+}
+
+async function capturarFotoRostro(){
+  if(rostroCapturando) return;
+  const video=document.getElementById('rostroCamVideo');
+  const shutter=document.getElementById('rostroCamShutter');
+  if(!video||!video.videoWidth||(shutter&&shutter.disabled)) return;
+  if(photoEntregaDataURLs.length>=5){
+    showToast('Máximo 5 fotos de quien recibe');
+    cerrarCamaraRostro();
+    return;
+  }
+  rostroCapturando=true;
+  const vw=video.videoWidth, vh=video.videoHeight;
+  const canvas=document.createElement('canvas');
+  const MAX=1024;
+  let w=vw, h=vh;
+  if(w>MAX||h>MAX){ if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;} }
+  canvas.width=w; canvas.height=h;
+  canvas.getContext('2d').drawImage(video,0,0,w,h);
+
+  const check=await validarImagenRostro(canvas);
+  if(check && check.ok===false){
+    rostroCapturando=false;
+    setRostroUi(check);
+    showToast('⚠ '+check.msg);
+    return;
+  }
+  const data=canvas.toDataURL('image/jpeg',0.7);
+  photoEntregaDataURLs.push(data);
+  renderPhotosPreview('entrega');
+  actualizarHintEntrega({ok:true});
+  showToast('✓ Rostro centrado. Foto guardada');
+  cerrarCamaraRostro();
+}
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) cerrarCamaraRostro();
+});
+
 function g(id){return(document.getElementById(id)?.value||'').trim();}
+
+function contarPalabras(s){
+  const t=String(s||'').trim();
+  if(!t) return 0;
+  return t.split(/\s+/).filter(Boolean).length;
+}
 
 function actualizarContadorDesc(){
   const el=document.getElementById('descripcion');
   const c=document.getElementById('descCounter');
   if(!el||!c) return;
-  const n=(el.value||'').trim().length;
-  c.textContent=n>=DESC_MIN
-    ? 'Descripción detallada · '+n+' caracteres'
-    : 'Mínimo '+DESC_MIN+' caracteres · '+n+'/'+DESC_MIN;
-  c.className='desc-counter '+(n>=DESC_MIN?'is-ok':'is-low');
+  const n=contarPalabras(el.value);
+  c.textContent=n>=DESC_MIN_PALABRAS
+    ? 'Observación detallada · '+n+' palabras'
+    : 'Mínimo '+DESC_MIN_PALABRAS+' palabras · '+n+'/'+DESC_MIN_PALABRAS;
+  c.className='desc-counter '+(n>=DESC_MIN_PALABRAS?'is-ok':'is-low');
 }
 
 function itemsEppsDe(r){
@@ -846,13 +1250,11 @@ function guardarReporte(){
     return;
   }
   const desc=g('descripcion');
-  if(!desc){showToast('⚠ Ingresa el motivo u observación del cambio');return;}
-  if(desc.length<DESC_MIN){
-    showToast('⚠ La observación debe tener mínimo '+DESC_MIN+' caracteres');
+  if(!desc){showToast('⚠ Ingresa las observaciones del cambio');return;}
+  if(contarPalabras(desc)<DESC_MIN_PALABRAS){
+    showToast('⚠ Las observaciones deben tener mínimo '+DESC_MIN_PALABRAS+' palabras');
     return;
   }
-
-  if(!g('responsable'))    {showToast('⚠ Ingresa el responsable de almacén');return;}
   if(!g('jefeInmediato'))  {showToast('⚠ Ingresa el jefe inmediato');return;}
   if(!g('ubicacion'))      {showToast('⚠ Selecciona el Área / Ubicación');return;}
   if(g('ubicacion')==='Otros' && !g('ubicacionOtros')){showToast('⚠ Especifica la ubicación');return;}
@@ -866,14 +1268,8 @@ function guardarReporte(){
 
   if(!getFirmaDataURL('firmaCanvas')){showToast('⚠ Dibuja tu firma para continuar');return;}
   if(!photoEntregaDataURLs.length){
-    showToast('⚠ Toma la foto de quien recibe el EPP con los EPPS nuevos');
+    showToast('⚠ Toma la foto de quien recibe el EPP, con el rostro al centro');
     return;
-  }
-
-  // Si está cerrado, validar campos de levantamiento
-  if(selectedEstado==='Cerrado'){
-
-    if(!g('medidasAcciones')){showToast('⚠ Describe las medidas/acciones realizadas');return;}
   }
 
   // dniObservado viene del campo hidden (seteado al seleccionar del dropdown)
@@ -889,7 +1285,7 @@ function guardarReporte(){
     descripcion:desc,
     cantidadEpps:cant,
     itemsEpps:itemsOk,
-    responsable:g('responsable'),
+    responsable:'',
     jefeInmediato:g('jefeInmediato'),
     ubicacion:g('ubicacion')==='Otros'?g('ubicacionOtros'):g('ubicacion')==='Interior Mina'&&g('ubicacionInterior')?'Interior Mina - '+g('ubicacionInterior'):g('ubicacion'),
     persona:persona,
@@ -936,7 +1332,7 @@ function guardarReporte(){
   );
   if(navigator.onLine) autoSync();
   else actualizarAvisoPendiente();
-  showTab('reportes');
+  showTab(puedeVerTab('reportes')?'reportes':'nuevo');
 }
 
 function toggleCategoriaOtro(){
@@ -961,7 +1357,7 @@ function resetForm(){
     c.className='chip'+(c.dataset.value==='Cerrado'?' sel-cerrado':'');
   });
   document.getElementById('seccionLevantamiento').style.display='block';
-  ['descripcion','responsable','jefeInmediato','persona','dniObservado','cargoReportado',
+  ['descripcion','jefeInmediato','persona','dniObservado','cargoReportado',
    'areaReportado','ubicacionOtros','medidasAcciones'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -976,11 +1372,9 @@ function resetForm(){
   document.getElementById('categoriaOtroWrap').style.display='none';
   const obsS=document.getElementById('observadoStatus');
   if(obsS){obsS.className='dni-status';obsS.textContent='';}
-  const respS=document.getElementById('responsableStatus');
-  if(respS){respS.className='dni-status';respS.textContent='';}
   const jefeS=document.getElementById('jefeInmediatoStatus');
   if(jefeS){jefeS.className='dni-status';jefeS.textContent='';}
-  ['observadoDropdown','responsableDropdown','jefeInmediatoDropdown'].forEach(id=>{
+  ['observadoDropdown','jefeInmediatoDropdown'].forEach(id=>{
     const dd=document.getElementById(id); if(dd) dd.style.display='none';
   });
   observadoSeleccionado=null;
@@ -991,6 +1385,8 @@ function resetForm(){
   limpiarFirma('firmaCanvas');
   document.getElementById('photosPreview').innerHTML='';
   const pe=document.getElementById('photosEntregaPreview'); if(pe) pe.innerHTML='';
+  actualizarHintEntrega(null);
+  cerrarCamaraRostro();
   const pl=document.getElementById('photosLevPreview'); if(pl) pl.innerHTML='';
   document.getElementById('fecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('hora').value=new Date().toTimeString().slice(0,5);
@@ -1211,7 +1607,7 @@ function openModal(id){
     ${row('Categoría',escapeHtml(r.categoria))}
     ${row('EPPS entregados', itemsHtml, true)}
     ${row('Observaciones',escapeHtml(r.descripcion),true)}
-    ${row('Responsable de almacén',escapeHtml(r.responsable))}
+    ${r.responsable?row('Responsable de almacén',escapeHtml(r.responsable)):''}
     ${row('Jefe inmediato',escapeHtml(r.jefeInmediato))}
     ${sec('Quién solicita / recibe el EPP')}
     ${row('Área / Ubicación',escapeHtml(r.ubicacion))}
@@ -1284,8 +1680,8 @@ function abrirEdicion(id){
 
     <div id="editLevantamientoSection" style="display:${estadoActual==='Cerrado'?'block':'none'};">
       <div class="form-section">
-        <label class="form-label">Acciones realizadas al cierre <span class="form-required">*</span></label>
-        <textarea id="editMedidasAcciones" placeholder="Describe las acciones realizadas al cierre...">${escapeHtml(r.medidasAcciones||'')}</textarea>
+        <label class="form-label">Acciones realizadas al cierre</label>
+        <textarea id="editMedidasAcciones" placeholder="Opcional. Describe las acciones realizadas al cierre...">${escapeHtml(r.medidasAcciones||'')}</textarea>
       </div>
     </div>
 
@@ -1327,14 +1723,9 @@ function guardarEdicion(){
   if(!getFirmaDataURL('firmaEditCanvas')){showToast('⚠ Dibuja tu firma para guardar');return;}
   const nuevoEstado=selectedEditEstado||r.estado||'Abierto';
 
-  // Si va a cerrado, validar solo medidas
   if(nuevoEstado==='Cerrado'){
-    const medidas=document.getElementById('editMedidasAcciones').value.trim();
-    if(!medidas){
-      showToast('⚠ Describe las medidas/acciones realizadas');
-      return;
-    }
-    r.medidasAcciones=medidas;
+    const medidasEl=document.getElementById('editMedidasAcciones');
+    r.medidasAcciones=(medidasEl?medidasEl.value:'').trim();
     if(r.estado!=='Cerrado'){
       r.fechaCierre=new Date().toISOString();
     }
@@ -1397,19 +1788,18 @@ function renderSeguimientos(){
     badge.style.display='none';
   }
 
-  // Agrupar por responsable de acción correctiva
-  const porResponsable={};
+  // Agrupar por jefe inmediato
+  const porJefe={};
   abiertos.forEach(r=>{
-    const resp=String(r.responsable||'').trim();
-    if(!resp) return;
-    const key=resp.toLowerCase();
-    if(!porResponsable[key]){
-      porResponsable[key]={nombre:resp, reportes:[]};
+    const jefe=String(r.jefeInmediato||'').trim()||'(Sin jefe inmediato)';
+    const key=jefe.toLowerCase();
+    if(!porJefe[key]){
+      porJefe[key]={nombre:jefe, reportes:[]};
     }
-    porResponsable[key].reportes.push(r);
+    porJefe[key].reportes.push(r);
   });
 
-  const grupos=Object.values(porResponsable).sort((a,b)=>b.reportes.length-a.reportes.length);
+  const grupos=Object.values(porJefe).sort((a,b)=>b.reportes.length-a.reportes.length);
 
   if(!grupos.length){
     list.innerHTML=`<div class="empty-state"><div class="empty-icon">✓</div><h3>Sin pendientes</h3><p style="font-size:13px;">No hay reportes abiertos pendientes de levantar</p></div>`;
@@ -1421,7 +1811,7 @@ function renderSeguimientos(){
       <div class="seg-person">
         <div style="flex:1;min-width:0;">
           <div class="seg-name">${escapeHtml(g.nombre)}</div>
-          <div class="seg-info">${g.reportes.length} acción${g.reportes.length>1?'es':''} correctiva${g.reportes.length>1?'s':''} pendiente${g.reportes.length>1?'s':''}</div>
+          <div class="seg-info">${g.reportes.length} vale${g.reportes.length>1?'s':''} abierto${g.reportes.length>1?'s':''} pendiente${g.reportes.length>1?'s':''} de cierre</div>
         </div>
         <div>
           <div class="seg-count">${g.reportes.length}</div>
@@ -1445,15 +1835,15 @@ function descargarPendientes(){
     return;
   }
 
-  // Agrupar por responsable
-  const porResponsable={};
+  // Agrupar por jefe inmediato
+  const porJefe={};
   abiertos.forEach(r=>{
-    const resp=String(r.responsable||'').trim()||'(Sin responsable asignado)';
-    const key=resp.toLowerCase();
-    if(!porResponsable[key]){ porResponsable[key]={nombre:resp, reportes:[]}; }
-    porResponsable[key].reportes.push(r);
+    const jefe=String(r.jefeInmediato||'').trim()||'(Sin jefe inmediato)';
+    const key=jefe.toLowerCase();
+    if(!porJefe[key]){ porJefe[key]={nombre:jefe, reportes:[]}; }
+    porJefe[key].reportes.push(r);
   });
-  const grupos=Object.values(porResponsable).sort((a,b)=>b.reportes.length-a.reportes.length);
+  const grupos=Object.values(porJefe).sort((a,b)=>b.reportes.length-a.reportes.length);
 
   const hoy=new Date();
   const fechaTxt=hoy.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -1504,7 +1894,7 @@ function descargarPendientes(){
 <div class="meta">
   <span><strong>Generado:</strong> ${fechaTxt} ${horaTxt}</span>
   <span><strong>Total pendientes:</strong> ${abiertos.length} reporte${abiertos.length>1?'s':''}</span>
-  <span><strong>Responsables:</strong> ${grupos.length}</span>
+  <span><strong>Jefes inmediatos:</strong> ${grupos.length}</span>
 </div>
 <div class="resumen">
   <h2>Resumen</h2>
@@ -2581,7 +2971,7 @@ function generarVale(id){
   <tr><td class="lbl">Observaciones</td><td colspan="3" style="white-space:pre-wrap;">${escapeHtml(r.descripcion||'—')}</td></tr>
   <tr><td class="lbl">Persona que solicita el cambio</td><td colspan="3" style="font-weight:700;font-size:13px;">${escapeHtml(sol.nombre||'—')}</td></tr>
   <tr><td class="lbl">DNI del solicitante</td><td style="font-family:monospace;">${escapeHtml(sol.dni||'—')}</td><td class="lbl">Área / Cargo</td><td>${escapeHtml(solAreaCargo)}</td></tr>
-  <tr><td class="lbl">Responsable (Almacén)</td><td>${escapeHtml(r.responsable||'—')}</td><td class="lbl">Jefe inmediato</td><td>${escapeHtml(r.jefeInmediato||'—')}</td></tr>
+  <tr><td class="lbl">Jefe inmediato</td><td colspan="3">${escapeHtml(r.jefeInmediato||'—')}</td></tr>
   <tr><td class="lbl">Registrado por</td><td colspan="3">${escapeHtml(r.reportador||REPORTANTE_DEFAULT)}</td></tr>
   </table>
   ${r.estado==='Cerrado'?`<table><tr><td class="lbl">Fecha Cierre</td><td>${fd(r.fechaCierre)}</td><td class="lbl">Medidas</td><td style="white-space:pre-wrap;">${escapeHtml(r.medidasAcciones||'—')}</td></tr></table>`:''}
