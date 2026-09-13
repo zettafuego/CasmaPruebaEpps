@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0a0a0a">
+<meta name="theme-color" content="#161616">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="Minera Casma — Cambio de EPPS. Cada registro es inmediato.">
 <title>Minera Casma · Cambio de EPPS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="splash-on">
 
-<!-- Intro estilo Netflix (mobile-first) -->
+<!-- Intro -->
 <div id="splash-intro" class="splash-intro" role="dialog" aria-label="Introducción Minera Casma · Cambio de EPPS" aria-live="polite">
   <div class="splash-bg"></div>
   <div class="splash-vignette"></div>
@@ -38,37 +38,43 @@
 <div id="app-shell" class="app-shell" hidden>
 
 <div id="roleGate" class="role-gate">
-  <img class="role-gate-logo" src="cita_minera_casma_sac-removebg-preview.png" alt="Minera Casma" width="72" height="72">
-  <p class="role-gate-brand">MINERA CASMA</p>
+  <img class="role-gate-logo" src="cita_minera_casma_sac-removebg-preview.png" alt="Minera Casma" width="88" height="88">
+  <p class="role-gate-brand">CIA. MINERA CASMA S.A.C.</p>
   <h1 class="role-gate-title">Cambio de EPPS</h1>
-  <p class="role-gate-lead">¿Quién va a usar la aplicación?</p>
-  <button type="button" class="role-card" onclick="entrarComoUsuario()">
-    <span class="role-card-icon">👷</span>
+  <p class="role-gate-lead">Elija cómo va a usar la aplicación</p>
+  <button type="button" class="role-card" id="roleCardUser" onclick="entrarComoUsuario()">
+    <span class="role-card-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.4"/><path d="M5.2 19.2c1.3-3.4 3.6-5 6.8-5s5.5 1.6 6.8 5"/></svg>
+    </span>
     <span class="role-card-text">
       <strong>Usuario de almacén</strong>
-      <em>Solo registrar vales de cambio de EPPS</em>
+      <em>Registrar vales de cambio de EPPS</em>
     </span>
+    <span class="role-card-go" aria-hidden="true">→</span>
   </button>
-  <button type="button" class="role-card" onclick="mostrarPinAdmin()">
-    <span class="role-card-icon">🛡️</span>
+  <button type="button" class="role-card" id="roleCardAdmin" onclick="mostrarPinAdmin()">
+    <span class="role-card-icon role-card-icon-admin" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 4.8 6.6v4.3c0 4.6 3 7.7 7.2 9.1 4.2-1.4 7.2-4.5 7.2-9.1V6.6L12 3.5z"/><path d="M9.2 12.1 11 14l3.8-4"/></svg>
+    </span>
     <span class="role-card-text">
       <strong>Administrador</strong>
-      <em>Ver reportes, seguimientos y estadísticas</em>
+      <em>Reportes, seguimientos y estadísticas</em>
     </span>
+    <span class="role-card-go" aria-hidden="true">→</span>
   </button>
   <form id="adminPinWrap" class="role-pin" hidden onsubmit="entrarComoAdmin(event)">
     <label class="form-label" for="adminPinInput">Clave de administrador</label>
     <input type="password" id="adminPinInput" maxlength="24" autocomplete="off" placeholder="Ingrese la clave">
-    <p class="role-pin-error" id="adminPinError" hidden>Clave incorrecta</p>
-    <button type="submit" class="btn-submit" style="margin-top:10px;">Entrar</button>
+    <p class="role-pin-error" id="adminPinError" hidden>Clave incorrecta. Intente de nuevo.</p>
+    <button type="submit" class="btn-submit">Entrar</button>
   </form>
 </div>
 
 <div id="appMain" hidden>
 
-<div class="banner banner-offline" id="offlineBanner"><span>⚠</span> Sin conexión — los reportes se guardarán localmente. No se retire hasta que sincronice.</div>
-<div class="banner banner-sync"    id="syncBanner"><span>⚠</span> No se retire — sincronizando evidencias. No cierre ni salga de la app.</div>
-<div class="banner banner-pending" id="pendingStayBanner"><span>⚠</span> Hay reportes sin sincronizar. No se retire hasta que el envío se complete.</div>
+<div class="banner banner-offline" id="offlineBanner"><span aria-hidden="true">⚠</span> Sin conexión — los reportes se guardarán localmente. No se retire hasta que sincronice.</div>
+<div class="banner banner-sync"    id="syncBanner"><span aria-hidden="true">⚠</span> No se retire — sincronizando evidencias. No cierre ni salga de la app.</div>
+<div class="banner banner-pending" id="pendingStayBanner"><span aria-hidden="true">⚠</span> Hay reportes sin sincronizar. No se retire hasta que el envío se complete.</div>
 
 <header class="app-header">
   <div class="header-brand">
@@ -88,252 +94,280 @@
   </div>
 </header>
 
-<div class="info-banner info-banner-user" role="status">
-  <span class="info-banner-icon" aria-hidden="true">⚡</span>
-  <div class="info-banner-text">
-    <strong>Cada registro es inmediato.</strong>
-    <span class="info-banner-more"> Se envía al instante a Minera Casma · Cambio de EPPS.</span>
-  </div>
-</div>
-
-<div class="tabs">
-  <button class="tab tab-user tab-solo-usuario active" data-tab="nuevo" onclick="showTab('nuevo')">＋ Nuevo</button>
-  <button class="tab tab-user" data-tab="reportes" onclick="showTab('reportes')">Reportes</button>
-  <button class="tab tab-user" data-tab="seguimientos" onclick="showTab('seguimientos')">Seguimientos<span class="tab-badge" id="segBadge" style="display:none">0</span></button>
-  <button class="tab tab-admin" data-tab="stats" onclick="showTab('stats')">Estadísticas</button>
+<div class="tabs" role="tablist">
+  <button class="tab tab-user tab-solo-usuario active" data-tab="nuevo" onclick="showTab('nuevo')" role="tab">
+    <span class="tab-ico" aria-hidden="true">＋</span> Nuevo
+  </button>
+  <button class="tab tab-user" data-tab="reportes" onclick="showTab('reportes')" role="tab">
+    <span class="tab-ico" aria-hidden="true">☰</span> Reportes
+  </button>
+  <button class="tab tab-user" data-tab="seguimientos" onclick="showTab('seguimientos')" role="tab">
+    <span class="tab-ico" aria-hidden="true">◷</span> Seguimientos<span class="tab-badge" id="segBadge" style="display:none">0</span>
+  </button>
+  <button class="tab tab-admin" data-tab="stats" onclick="showTab('stats')" role="tab">
+    <span class="tab-ico" aria-hidden="true">▣</span> Estadísticas
+  </button>
 </div>
 
 <!-- TAB: NUEVO REPORTE -->
-<div class="content" id="tab-nuevo">
+<div class="content content-form" id="tab-nuevo">
 
-  <div class="form-section form-section-hint">
-    <p class="hint-inmediato">
-      ⚡ <strong>Registro inmediato:</strong> al pulsar «Guardar», el vale se sincroniza al momento
-      (si hay internet). Minera Casma · Cambio de EPPS.
-    </p>
-  </div>
+  <section class="form-card">
+    <header class="form-card-head">
+      <span class="form-card-step">1</span>
+      <div>
+        <h2>El vale</h2>
+        <p>Estado, motivo y categoría del cambio</p>
+      </div>
+    </header>
 
-  <div class="form-section">
-    <label class="form-label">Estado del reporte <span class="form-required">*</span></label>
-    <div class="chip-group" id="estado-chips">
-      <div class="chip" data-value="Abierto" onclick="selectEstado(this)">● Abierto</div>
-      <div class="chip sel-cerrado" data-value="Cerrado" onclick="selectEstado(this)">● Cerrado</div>
+    <div class="form-section">
+      <label class="form-label">Estado del reporte <span class="form-required">*</span></label>
+      <div class="chip-group" id="estado-chips" role="group">
+        <div class="chip" data-value="Abierto" onclick="selectEstado(this)">Abierto</div>
+        <div class="chip sel-cerrado" data-value="Cerrado" onclick="selectEstado(this)">Cerrado</div>
+      </div>
+      <p class="hint-text">Por defecto el vale nace <strong>Cerrado</strong>.</p>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:6px;">Por defecto el reporte nace <strong>Cerrado</strong>. Las acciones realizadas son opcionales.</div>
-  </div>
 
-  <div class="form-section">
-    <label class="form-label">Motivo (acto / condición) <span class="form-required">*</span></label>
-    <div class="chip-group" id="tipo-chips">
-      <div class="chip" data-value="Acto Subestándar"      onclick="selectTipo(this)">Acto Subestándar</div>
-      <div class="chip" data-value="Condición Subestándar" onclick="selectTipo(this)">Condición Subestándar</div>
+    <div class="form-section">
+      <label class="form-label">Motivo (acto / condición) <span class="form-required">*</span></label>
+      <div class="chip-group" id="tipo-chips" role="group">
+        <div class="chip" data-value="Acto Subestándar" onclick="selectTipo(this)">Acto Subestándar</div>
+        <div class="chip" data-value="Condición Subestándar" onclick="selectTipo(this)">Condición Subestándar</div>
+      </div>
     </div>
-  </div>
 
-
-  <div class="form-section">
-    <label class="form-label">Categoría <span class="form-required">*</span></label>
-    <select id="categoria" onchange="toggleCategoriaOtro()">
-      <option value="">— Seleccionar —</option>
-      <option value="Pérdida de EPPs">Pérdida de EPPs</option>
-      <option value="Robo">Robo</option>
-      <option value="Desgaste por uso (antes de cambio)">Desgaste por uso (antes de cambio)</option>
-      <option value="Cambio de vida útil">Cambio de vida útil</option>
-      <option value="Otro">Otros</option>
-    </select>
-    <div id="categoriaOtroWrap" style="display:none;margin-top:8px;">
-      <input type="text" id="categoriaOtro" placeholder="Describe la categoría...">
-    </div>
-  </div>
-
-  <div class="form-section">
-    <label class="form-label">EPPS entregados <span class="form-required">*</span></label>
-    <div id="eppItemsList"></div>
-    <button type="button" class="btn-add-epp" onclick="agregarItemEpp()">＋ Agregar otro EPP</button>
-    <div class="epp-total" id="eppItemsTotal">Total: 0 unidades</div>
-    <div style="font-size:11px;color:var(--text3);margin-top:6px;">Tipo, talla y cantidad de cada EPP que se entrega o reemplaza.</div>
-  </div>
-
-  <div class="form-section">
-    <label class="form-label">Observaciones del cambio <span class="form-required">*</span></label>
-    <textarea id="descripcion" class="desc-detalle" rows="5"
-      oninput="actualizarContadorDesc()"
-      placeholder="Motivo u observación: estado del EPP retirado (roto, vencido, perdido), labor o zona, y cualquier detalle que almacén deba saber."></textarea>
-    <div class="desc-hint">
-      Tipo, talla y cantidad van arriba. Aquí el motivo del cambio, con al menos 20 palabras.
-    </div>
-    <div class="desc-counter" id="descCounter">Mínimo 20 palabras · 0/20</div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="form-section">
-    <label class="form-label">Lugar </label>
-    <div style="margin-bottom:12px;">
-      <label class="form-sublabel">Área / Ubicación <span class="form-required">*</span></label>
-      <select id="ubicacion" onchange="toggleUbicacionOtros()">
-      <option value="">— Seleccionar —</option>
-      <option>Campamento</option>
-      <option>Garita</option>
-      <option>Zona 1</option>
-      <option>Zona 2</option>
-      <option>Zona 3</option>
-      <option>Zona 4</option>
-      <option>Zona 5</option>
-      <option>Zona 6</option>
-      <option>Zona Lomas</option>
-      <option value="Otros">Otros</option>
+    <div class="form-section form-section-last">
+      <label class="form-label" for="categoria">Categoría <span class="form-required">*</span></label>
+      <select id="categoria" onchange="toggleCategoriaOtro()">
+        <option value="">— Seleccionar —</option>
+        <option value="Pérdida de EPPs">Pérdida de EPPs</option>
+        <option value="Robo">Robo</option>
+        <option value="Desgaste por uso (antes de cambio)">Desgaste por uso (antes de cambio)</option>
+        <option value="Cambio de vida útil">Cambio de vida útil</option>
+        <option value="Otro">Otros</option>
       </select>
+      <div id="categoriaOtroWrap" class="field-follow" style="display:none;">
+        <input type="text" id="categoriaOtro" placeholder="Describe la categoría...">
+      </div>
     </div>
-    <div id="ubicacionInteriorWrap" style="display:none;margin-bottom:12px;">
-      <label class="form-sublabel">Labor en Interior Mina</label>
-      <input type="text" id="ubicacionInterior" placeholder="Ej: Galería 5N, Nivel 320, Tajeo...">
+  </section>
+
+  <section class="form-card">
+    <header class="form-card-head">
+      <span class="form-card-step">2</span>
+      <div>
+        <h2>EPPS entregados</h2>
+        <p>Tipo, talla y cantidad de cada ítem</p>
+      </div>
+    </header>
+    <div class="form-section form-section-last">
+      <div id="eppItemsList"></div>
+      <button type="button" class="btn-add-epp" onclick="agregarItemEpp()">＋ Agregar otro EPP</button>
+      <div class="epp-total" id="eppItemsTotal">Total: 0 unidades</div>
     </div>
-    <div id="ubicacionOtrosWrap" style="display:none;margin-bottom:12px;">
-      <label class="form-sublabel">Especifica la ubicación <span class="form-required">*</span></label>
-      <input type="text" id="ubicacionOtros" placeholder="Describe el área o ubicación">
+  </section>
+
+  <section class="form-card">
+    <header class="form-card-head">
+      <span class="form-card-step">3</span>
+      <div>
+        <h2>Observaciones</h2>
+        <p>Motivo del cambio, en al menos 10 palabras</p>
+      </div>
+    </header>
+    <div class="form-section form-section-last">
+      <label class="form-label" for="descripcion">Detalle del cambio <span class="form-required">*</span></label>
+      <textarea id="descripcion" class="desc-detalle" rows="3"
+        oninput="actualizarContadorDesc()"
+        placeholder="Ej: Casco perdido en Zona 2 durante el turno."></textarea>
+      <div class="desc-counter" id="descCounter">Mínimo 10 palabras · 0/10</div>
+    </div>
+  </section>
+
+  <section class="form-card">
+    <header class="form-card-head">
+      <span class="form-card-step">4</span>
+      <div>
+        <h2>Lugar y persona</h2>
+        <p>Ubicación y quién recibe el EPP</p>
+      </div>
+    </header>
+
+    <div class="form-section">
+      <label class="form-label" for="ubicacion">Área / Ubicación <span class="form-required">*</span></label>
+      <select id="ubicacion" onchange="toggleUbicacionOtros()">
+        <option value="">— Seleccionar —</option>
+        <option>Campamento</option>
+        <option>Garita</option>
+        <option>Zona 1</option>
+        <option>Zona 2</option>
+        <option>Zona 3</option>
+        <option>Zona 4</option>
+        <option>Zona 5</option>
+        <option>Zona 6</option>
+        <option>Zona Lomas</option>
+        <option value="Otros">Otros</option>
+      </select>
+      <div id="ubicacionInteriorWrap" class="field-follow" style="display:none;">
+        <label class="form-sublabel" for="ubicacionInterior">Labor en Interior Mina</label>
+        <input type="text" id="ubicacionInterior" placeholder="Ej: Galería 5N, Nivel 320, Tajeo...">
+      </div>
+      <div id="ubicacionOtrosWrap" class="field-follow" style="display:none;">
+        <label class="form-sublabel" for="ubicacionOtros">Especifica la ubicación <span class="form-required">*</span></label>
+        <input type="text" id="ubicacionOtros" placeholder="Describe el área o ubicación">
+      </div>
     </div>
 
-    <div style="margin-bottom:12px;position:relative;">
-      <label class="form-sublabel">DNI de quien solicita el cambio <span class="form-required">*</span></label>
-      <input type="text" id="dniObservado" placeholder="Buscar por DNI (8 dígitos)..."
+    <div class="form-section field-wrap">
+      <label class="form-label" for="dniObservado">DNI de quien solicita el cambio <span class="form-required">*</span></label>
+      <input type="text" id="dniObservado" placeholder="8 dígitos"
              maxlength="8" inputmode="numeric" autocomplete="off"
              oninput="onDniObservadoInput()" onfocus="onDniObservadoInput()">
-      <div id="dniObservadoDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
+      <div id="dniObservadoDropdown" class="dropdown-list"></div>
       <div class="dni-status" id="observadoStatus"></div>
     </div>
-    <div style="margin-bottom:12px;position:relative;">
-      <label class="form-sublabel">Quién solicita el cambio / recibe el EPP <span class="form-required">*</span></label>
-      <input type="text" id="persona" placeholder="Se completa con el DNI; o escriba un nombre nuevo..." autocomplete="off"
+
+    <div class="form-section field-wrap">
+      <label class="form-label" for="persona">Quién solicita / recibe el EPP <span class="form-required">*</span></label>
+      <input type="text" id="persona" placeholder="Nombre — se completa con el DNI" autocomplete="off"
              oninput="buscarObservadoPorNombre()" onfocus="buscarObservadoPorNombre()">
-      <div id="observadoDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
+      <div id="observadoDropdown" class="dropdown-list"></div>
     </div>
+
     <div class="form-row">
       <div>
-        <label class="form-sublabel">Área del solicitante <span class="form-required">*</span></label>
-        <input type="text" id="areaReportado" placeholder="Se completa si existe; si no, escríbala"
+        <label class="form-sublabel" for="areaReportado">Área del solicitante <span class="form-required">*</span></label>
+        <input type="text" id="areaReportado" placeholder="Área"
                autocomplete="off">
       </div>
       <div>
-        <label class="form-sublabel">Cargo del solicitante</label>
-        <input type="text" id="cargoReportado" placeholder="Se completa si existe; si no, escríbalo"
+        <label class="form-sublabel" for="cargoReportado">Cargo del solicitante</label>
+        <input type="text" id="cargoReportado" placeholder="Cargo"
                autocomplete="off">
       </div>
     </div>
-    <div style="margin-top:12px;position:relative;">
-      <label class="form-sublabel">Jefe inmediato <span class="form-required">*</span></label>
-      <input type="text" id="jefeInmediato" placeholder="Buscar por DNI o nombre..."
+
+    <div class="form-section field-wrap">
+      <label class="form-label" for="jefeInmediato">Jefe inmediato <span class="form-required">*</span></label>
+      <input type="text" id="jefeInmediato" placeholder="DNI o nombre"
              autocomplete="off" oninput="buscarJefeInmediato()" onfocus="buscarJefeInmediato()">
-      <div id="jefeInmediatoDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);z-index:50;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.15);"></div>
+      <div id="jefeInmediatoDropdown" class="dropdown-list"></div>
       <div class="dni-status" id="jefeInmediatoStatus"></div>
+      <p class="hint-text">Al coincidir el DNI se autocompletan nombre, área y cargo.</p>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:6px;">
-      Busque preferentemente por DNI: al coincidir se autocompletan nombre, área y cargo.
-      Si no existe, complete DNI, nombre, área y cargo: se guardará al registrar el vale.
-    </div>
-  </div>
 
-  <div class="form-section">
-    <div class="form-row">
-      <div>
-        <label class="form-label">Fecha <span class="form-required">*</span></label>
-        <input type="date" id="fecha">
-      </div>
-      <div>
-        <label class="form-label">Hora <span class="form-required">*</span></label>
-        <input type="time" id="hora">
+    <div class="form-section form-section-last">
+      <div class="form-row form-row-2">
+        <div>
+          <label class="form-label" for="fecha">Fecha <span class="form-required">*</span></label>
+          <input type="date" id="fecha">
+        </div>
+        <div>
+          <label class="form-label" for="hora">Hora <span class="form-required">*</span></label>
+          <input type="time" id="hora">
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="divider"></div>
+  <section class="form-card">
+    <header class="form-card-head">
+      <span class="form-card-step">5</span>
+      <div>
+        <h2>Evidencias</h2>
+        <p>Fotos de retiro, entrega y firma</p>
+      </div>
+    </header>
 
-  <div class="form-section">
-    <label class="form-label">Foto de EPPS retirados</label>
-    <input type="file" id="inputGaleria" accept="image/*" multiple style="display:none" onchange="handlePhotos(this, 'hallazgo')">
-    <input type="file" id="inputCamara" accept="image/*" capture="environment" style="display:none" onchange="handlePhotos(this, 'hallazgo')">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <button type="button" onclick="document.getElementById('inputCamara').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
-        <span style="font-size:26px;">📷</span>
-        <span>Tomar foto</span>
-      </button>
-      <button type="button" onclick="document.getElementById('inputGaleria').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
-        <span style="font-size:26px;">🖼️</span>
-        <span>Galería</span>
-      </button>
-    </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center;">Máximo 5 fotos de los EPPS que se retiran</div>
-    <div class="photos-grid" id="photosPreview"></div>
-  </div>
-
-  <div class="form-section">
-    <label class="form-label">Foto de EPPS nuevos y quien recibe el EPP <span class="form-required">*</span></label>
-    <input type="file" id="inputGaleriaEntrega" accept="image/*" multiple style="display:none" onchange="handlePhotos(this, 'entrega')">
-    <input type="file" id="inputCamaraEntrega" accept="image/*" capture="user" style="display:none" onchange="handlePhotos(this, 'entrega')">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <button type="button" onclick="abrirCamaraRostro()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
-        <span style="font-size:26px;">📷</span>
-        <span>Tomar foto</span>
-      </button>
-      <button type="button" onclick="document.getElementById('inputGaleriaEntrega').click()" style="padding:14px 10px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:var(--radius);color:var(--text2);font-family:var(--sans);font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
-        <span style="font-size:26px;">🖼️</span>
-        <span>Galería</span>
-      </button>
-    </div>
-    <div class="rostro-form-hint" id="entregaRostroHint">
-      <strong>Cómo tomar la foto:</strong> el rostro de quien recibe debe quedar <strong>al centro</strong>, mirando a la cámara, con el EPP nuevo visible. La guía le irá indicando si debe acercarse, alejarse o moverse.
-    </div>
-    <div class="photos-grid" id="photosEntregaPreview"></div>
-  </div>
-
-  <!-- Sección levantamiento (solo si Cerrado) -->
-  <div id="seccionLevantamiento" style="display:block;">
-    <div class="divider"></div>
     <div class="form-section">
-      <label class="form-label">Acciones realizadas al cierre</label>
-      <textarea id="medidasAcciones" placeholder="Opcional. Describe las acciones: entrega del EPP, talla, y lo que se retiró..."></textarea>
+      <label class="form-label">Foto de EPPS retirados</label>
+      <input type="file" id="inputGaleria" accept="image/*" multiple hidden onchange="handlePhotos(this, 'hallazgo')">
+      <input type="file" id="inputCamara" accept="image/*" capture="environment" hidden onchange="handlePhotos(this, 'hallazgo')">
+      <div class="photo-pick-grid">
+        <button type="button" class="photo-pick-btn" onclick="document.getElementById('inputCamara').click()">
+          <span aria-hidden="true">📷</span>
+          <span>Tomar foto</span>
+        </button>
+        <button type="button" class="photo-pick-btn" onclick="document.getElementById('inputGaleria').click()">
+          <span aria-hidden="true">🖼</span>
+          <span>Galería</span>
+        </button>
+      </div>
+      <p class="hint-text center">Máximo 5 fotos de los EPPS que se retiran</p>
+      <div class="photos-grid" id="photosPreview"></div>
     </div>
-  </div>
 
-  <div class="form-section">
-    <label class="form-label">Firma del Registrador <span class="form-required">*</span></label>
-    <div style="background:var(--surface2);border:1.5px solid var(--border2);border-radius:var(--radius);overflow:hidden;">
-      <canvas id="firmaCanvas" width="540" height="160" style="width:100%;display:block;cursor:crosshair;background:#fff;touch-action:none;"></canvas>
+    <div class="form-section">
+      <label class="form-label">Foto de EPPS nuevos y quien recibe <span class="form-required">*</span></label>
+      <input type="file" id="inputGaleriaEntrega" accept="image/*" multiple hidden onchange="handlePhotos(this, 'entrega')">
+      <input type="file" id="inputCamaraEntrega" accept="image/*" capture="user" hidden onchange="handlePhotos(this, 'entrega')">
+      <div class="photo-pick-grid">
+        <button type="button" class="photo-pick-btn photo-pick-btn-primary" onclick="abrirCamaraRostro()">
+          <span aria-hidden="true">📷</span>
+          <span>Tomar foto</span>
+        </button>
+        <button type="button" class="photo-pick-btn" onclick="document.getElementById('inputGaleriaEntrega').click()">
+          <span aria-hidden="true">🖼</span>
+          <span>Galería</span>
+        </button>
+      </div>
+      <div class="rostro-form-hint" id="entregaRostroHint">
+        <strong>Cómo tomar la foto:</strong> el rostro de quien recibe debe quedar <strong>al centro</strong>, mirando a la cámara, con el EPP nuevo visible. Cuando lo reconozca, <strong>la foto se toma sola</strong>.
+      </div>
+      <div class="photos-grid" id="photosEntregaPreview"></div>
     </div>
-    <button type="button" onclick="limpiarFirma('firmaCanvas')" style="margin-top:6px;padding:6px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text2);font-family:var(--sans);font-size:12px;cursor:pointer;">🗑 Limpiar firma</button>
-  </div>
 
-  <button class="btn-submit" onclick="guardarReporte()">Guardar vale</button>
-  <p class="hint-sync-stay">⚠ No se retire hasta que el reporte sincronice. Espere el aviso de envío completo.</p>
-  <div style="height:40px;"></div>
+    <div class="form-section form-section-last">
+      <label class="form-label">Firma de quien solicita el cambio <span class="form-required">*</span></label>
+      <div class="firma-wrap">
+        <canvas id="firmaCanvas" width="540" height="160" aria-label="Firma de quien solicita el cambio"></canvas>
+      </div>
+      <p class="hint-text">Quien solicita / recibe el EPP debe firmar aquí. Esa firma sale impresa en el vale.</p>
+      <button type="button" class="btn-clear-firma" onclick="limpiarFirma('firmaCanvas')">Limpiar firma</button>
+    </div>
+  </section>
+
+  <div class="form-sticky">
+    <p class="form-sticky-hint">Se envía al instante si hay internet. No se retire hasta que sincronice.</p>
+    <button type="button" class="btn-submit" onclick="guardarReporte()">Guardar vale</button>
+  </div>
 </div>
 
 <!-- TAB: REPORTES -->
 <div class="content" id="tab-reportes" style="display:none;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px;flex-wrap:wrap;">
-    <div style="font-size:12px;color:var(--text3);font-family:var(--mono);" id="serverSyncInfo">—</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-      <button onclick="exportarPDF()" style="display:flex;align-items:center;gap:4px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 10px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans);">📄 PDF</button>
-      <button onclick="exportarExcel()" style="display:flex;align-items:center;gap:4px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 10px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans);">📊 Excel</button>
-      <button onclick="cargarDelServidor()" id="btnCargarServidor" style="display:flex;align-items:center;gap:4px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 10px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans);">↓ Cargar</button>
+
+  <div class="toolbar-row">
+    <div class="server-sync-info" id="serverSyncInfo">—</div>
+    <div class="btn-toolbar">
+      <button type="button" class="btn-sm btn-sm-pdf" onclick="exportarPDF()">PDF</button>
+      <button type="button" class="btn-sm btn-sm-excel" onclick="exportarExcel()">Excel</button>
+      <button type="button" class="btn-sm btn-sm-load" onclick="cargarDelServidor()" id="btnCargarServidor">Cargar</button>
     </div>
   </div>
-  <div style="display:flex;gap:8px;margin-bottom:12px;">
-    <input type="text" placeholder="Buscar..." id="searchInput" oninput="renderReportes()" style="flex:1;">
-    <select id="filterTipo" onchange="renderReportes()" style="width:auto;padding:10px 10px;">
+
+  <div class="filter-row">
+    <div class="search-wrap">
+      <span class="search-ico" aria-hidden="true">⌕</span>
+      <input type="search" placeholder="Buscar DNI, nombre, EPP…" id="searchInput" oninput="renderReportes()">
+    </div>
+    <select id="filterTipo" onchange="renderReportes()" aria-label="Filtrar por motivo">
       <option value="">Todos</option>
       <option value="Acto Subestándar">Acto Sub.</option>
       <option value="Condición Subestándar">Cond. Sub.</option>
     </select>
   </div>
-  <div style="display:flex;gap:8px;margin-bottom:16px;">
-    <button class="chip" id="filterEstadoTodos"   onclick="setFiltroEstado('')"        style="font-weight:500;">Todos</button>
-    <button class="chip" id="filterEstadoAbierto" onclick="setFiltroEstado('Abierto')" style="font-weight:500;">● Abierto</button>
-    <button class="chip" id="filterEstadoCerrado" onclick="setFiltroEstado('Cerrado')" style="font-weight:500;">● Cerrado</button>
+
+  <div class="filter-chips">
+    <button type="button" class="chip" id="filterEstadoTodos" onclick="setFiltroEstado('')">Todos</button>
+    <button type="button" class="chip" id="filterEstadoAbierto" onclick="setFiltroEstado('Abierto')">Abierto</button>
+    <button type="button" class="chip" id="filterEstadoCerrado" onclick="setFiltroEstado('Cerrado')">Cerrado</button>
   </div>
-  <div id="filtroActivoBanner" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:var(--radius-sm);background:var(--accent-dim);border:1px solid var(--accent);font-size:13px;color:var(--accent);display:flex;justify-content:space-between;align-items:center;">
+
+  <div id="filtroActivoBanner" class="filtro-banner">
     <span id="filtroActivoTexto"></span>
-    <button onclick="limpiarFiltros()" style="background:none;border:none;color:var(--accent);font-size:18px;cursor:pointer;line-height:1;">×</button>
+    <button type="button" class="filtro-banner-close" onclick="limpiarFiltros()" aria-label="Quitar filtro">×</button>
   </div>
   <div id="reportesList"></div>
 </div>
@@ -343,11 +377,9 @@
   <div class="seg-header">
     <div>
       <h2>Seguimientos</h2>
-      <p style="font-size:12px;color:var(--text3);margin-top:3px;">Vales abiertos pendientes de cierre</p>
+      <p>Vales abiertos pendientes de cierre</p>
     </div>
-    <button class="btn-download" onclick="descargarPendientes()">
-      <span>↓</span> Descargar lista
-    </button>
+    <button type="button" class="btn-download" onclick="descargarPendientes()">Descargar lista</button>
   </div>
   <div id="seguimientosList"></div>
 </div>
@@ -361,49 +393,48 @@
     </div>
     <div class="stats-live-right" id="statsLiveStamp">Esperando datos…</div>
   </div>
-  <!-- Filtro mes/año -->
-  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-    <select id="statsMes" onchange="onStatsPeriodoChange()" style="flex:1;min-width:120px;padding:9px 12px;font-size:14px;">
+  <div class="stats-filter-row">
+    <select id="statsMes" onchange="onStatsPeriodoChange()" aria-label="Mes">
       <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
       <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
       <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
       <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
     </select>
-    <select id="statsAnio" onchange="onStatsPeriodoChange()" style="width:90px;padding:9px 12px;font-size:14px;"></select>
-    <button onclick="resetFiltroStats()" style="padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:13px;cursor:pointer;white-space:nowrap;">Todo</button>
-    <button onclick="imprimirStatsMes()" style="padding:9px 12px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;font-family:var(--sans);">🖨 Imprimir</button>
+    <select id="statsAnio" onchange="onStatsPeriodoChange()" aria-label="Año"></select>
+    <button type="button" class="btn-ghost" onclick="resetFiltroStats()">Todo</button>
+    <button type="button" class="btn-sm btn-sm-load" onclick="imprimirStatsMes()">Imprimir</button>
   </div>
-  <div id="statsPeriodoLabel" style="font-size:12px;color:var(--text3);margin-bottom:8px;font-family:var(--mono);"></div>
+  <div id="statsPeriodoLabel" class="stats-periodo-label"></div>
   <div id="statsHeroMes"></div>
   <div class="section-title">EPPS cambiados por día</div>
   <div id="statsHoyEpps"></div>
   <div class="dia-grid" id="statsPorDia"></div>
   <div class="section-title">Cambios de EPPS por mes</div>
   <div class="mes-bars" id="statsPorMes"></div>
-  <div id="statsFiltroActivo" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:var(--radius-sm);background:var(--accent-dim);border:1px solid var(--accent);font-size:13px;color:var(--accent);display:flex;justify-content:space-between;align-items:center;">
+  <div id="statsFiltroActivo" class="filtro-banner">
     <span id="statsFiltroTexto"></span>
-    <button onclick="limpiarFiltrosStats()" style="background:none;border:none;color:var(--accent);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">×</button>
+    <button type="button" class="filtro-banner-close" onclick="limpiarFiltrosStats()" aria-label="Quitar filtro">×</button>
   </div>
   <div class="stats-grid" id="statsGrid"></div>
   <div class="stats-top3" id="statsTop3"></div>
   <div class="section-title">Área con más cambios de EPPS</div>
-  <div id="statsAreas" style="margin-bottom:20px;"></div>
+  <div id="statsAreas" class="stats-block"></div>
   <div class="section-title">Personas con más cambios de EPPS</div>
-  <div id="statsPersonas" style="margin-bottom:20px;"></div>
+  <div id="statsPersonas" class="stats-block"></div>
   <div class="section-title">EPPS entregados por tipo</div>
-  <div id="statsTipoEpp" style="margin-bottom:20px;"></div>
+  <div id="statsTipoEpp" class="stats-block"></div>
   <div class="section-title">Clasificación más recurrente</div>
-  <div id="statsClasificacion" style="margin-bottom:20px;"></div>
-  <div class="section-title" style="margin-top:8px;">Por estado</div>
-  <div id="statsEstado" style="margin-bottom:20px;"></div>
+  <div id="statsClasificacion" class="stats-block"></div>
+  <div class="section-title">Por estado</div>
+  <div id="statsEstado" class="stats-block"></div>
   <div class="section-title">Por motivo (acto / condición)</div>
-  <div id="statsTipo" style="margin-bottom:20px;"></div>
+  <div id="statsTipo" class="stats-block"></div>
   <div class="section-title">Por categoría — distribución</div>
-  <canvas id="statsPieChart" style="max-width:280px;max-height:280px;display:block;margin:0 auto 12px;"></canvas>
-  <div id="statsPieLegend" style="margin-bottom:20px;"></div>
+  <canvas id="statsPieChart" class="stats-pie"></canvas>
+  <div id="statsPieLegend" class="stats-block"></div>
   <div class="section-title">Por categoría — detalle</div>
   <div id="statsCategoria"></div>
-  <div style="height:40px;"></div>
+  <div class="spacer-bottom"></div>
 </div>
 
 <!-- MODAL DETALLE -->
@@ -431,7 +462,7 @@
     <canvas id="rostroCamCanvas" class="rostro-cam-canvas"></canvas>
     <div class="rostro-cam-oval" id="rostroCamOval" aria-hidden="true"></div>
   </div>
-  <div class="rostro-cam-hint is-warn" id="rostroCamHint">Coloque el rostro de quien recibe al centro del óvalo.</div>
+  <div class="rostro-cam-hint is-warn" id="rostroCamHint">Centre el rostro en el óvalo. La foto se toma sola.</div>
   <div class="rostro-cam-bar">
     <button type="button" class="rostro-cam-cancel" onclick="cerrarCamaraRostro()">Cancelar</button>
     <button type="button" class="rostro-cam-shutter" id="rostroCamShutter" disabled onclick="capturarFotoRostro()" aria-label="Capturar foto">
@@ -450,10 +481,20 @@
   </div>
 </div>
 
+<div id="valeOverlay" class="vale-overlay" hidden>
+  <div class="vale-sheet" role="dialog" aria-modal="true" aria-labelledby="valeTitle">
+    <div class="vale-ok-banner">Vale sincronizado</div>
+    <div id="valeContent"></div>
+    <div class="vale-actions">
+      <button type="button" class="btn-edit" onclick="imprimirValeActual()">Imprimir vale</button>
+      <button type="button" class="btn-close-modal" onclick="cerrarValeOverlay()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /#appMain -->
 </div><!-- /#app-shell -->
 
-<!-- Config: Drive, Excel, Apps Script → js/config.js -->
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
 </body>

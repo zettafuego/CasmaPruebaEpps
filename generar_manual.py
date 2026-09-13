@@ -454,7 +454,7 @@ def build():
             ["Jefe inmediato", "S\u00ed", "Buscar por DNI o nombre"],
             ["Fecha y hora", "S\u00ed", "Precargadas"],
             ["Foto de quien recibe + EPPS nuevos", "S\u00ed", "M\u00e1ximo 5"],
-            ["Firma del registrador", "S\u00ed", "Dibujar en el recuadro"],
+            ["Firma de quien solicita el cambio", "S\u00ed", "Dibujar en el recuadro; sale impresa en el vale"],
             ["Foto de EPPS retirados", "No", "Recomendada para el vale"],
             ["Cargo del solicitante", "No", "Completar si se conoce"],
         ],
@@ -526,9 +526,9 @@ def build():
     ))
     story.append(p("Firma", "H2"))
     story.append(p(
-        "Dibuje la firma del registrador (SSOMA o quien opera la app) en el recuadro blanco. "
-        "Si se equivoca, pulse Limpiar firma. En la impresion hay una segunda linea vacia "
-        "para la firma manuscrita de quien solicita el cambio.",
+        "Quien solicita el cambio debe firmar en el recuadro blanco. Esa firma es la que "
+        "sale impresa en el vale, con su nombre y DNI. Si se equivoca, pulse Limpiar firma. "
+        "En la impresion queda una segunda linea vacia para el almac\u00e9n.",
         "Body",
     ))
 
